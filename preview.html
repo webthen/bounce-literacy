@@ -1,0 +1,1907 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>《弹弹识字》V1</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+    body {
+      background: #1E202B;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      width: 100vw;
+      max-width: 1280px;
+      aspect-ratio: 16 / 9;
+      background: #FFF9E6;
+      border-radius: 16px;
+      box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+      overflow: hidden;
+    }
+    #game-container.in-page-rotated {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      max-width: 177.78vw !important;
+      max-height: 56.25vh !important;
+      transform: translate(-50%, -50%) rotate(90deg) !important;
+      transform-origin: center center !important;
+      z-index: 1000 !important;
+      border-radius: 0 !important;
+      box-shadow: 0 0 50px rgba(0,0,0,0.8) !important;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 顶部 HUD 栏 */
+    .hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 72px;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .hud-left, .hud-center, .hud-right {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      pointer-events: auto;
+    }
+    .badge {
+      background: #FFA000;
+      color: #FFF;
+      font-size: 19px;
+      font-weight: bold;
+      padding: 6px 18px;
+      border-radius: 20px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    }
+    .combo-badge {
+      background: #FF5252;
+      color: #FFF;
+      font-size: 22px;
+      font-weight: 900;
+      padding: 6px 20px;
+      border-radius: 20px;
+      animation: pulse 0.5s infinite alternate;
+      display: none;
+    }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.12); } }
+    .btn-hud {
+      background: #FFF;
+      border: 2px solid #E0E0E0;
+      font-size: 16px;
+      font-weight: bold;
+      padding: 8px 16px;
+      border-radius: 16px;
+      cursor: pointer;
+      color: #5D4037;
+      transition: all 0.1s;
+    }
+    .btn-hud:active { transform: scale(0.92); }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FFF;
+      border: 2px solid #E0E0E0;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #5D4037;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+      transition: transform 0.1s, background 0.15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      padding: 0;
+    }
+    .btn-icon:active {
+      transform: scale(0.92);
+      background: #F5F5F5;
+    }
+
+    /* 命中大字光圈 */
+    #big-word-popup {
+      position: absolute;
+      top: 42%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: rgba(255, 255, 255, 0.96);
+      border: 8px solid #FFA000;
+      border-radius: 36px;
+      padding: 24px 60px;
+      box-shadow: 0 15px 40px rgba(255, 160, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+    }
+    #big-word-popup.show { transform: translate(-50%, -50%) scale(1); }
+    #big-word-pinyin { font-size: 32px; color: #FFA000; font-weight: bold; }
+    #big-word-char { font-size: 110px; color: #2B2D42; font-weight: 900; line-height: 1.1; }
+    #big-word-pts { font-size: 26px; color: #4CAF50; font-weight: bold; margin-top: 4px; }
+
+    /* 通用全屏遮罩弹窗 */
+    .modal-mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.65);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-mask.show { opacity: 1; pointer-events: auto; }
+    .card {
+      background: #FFF;
+      width: 520px;
+      max-width: 90%;
+      border-radius: 28px;
+      padding: 32px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { from { transform: scale(0.7); } to { transform: scale(1); } }
+    .btn-main {
+      background: #4CAF50;
+      color: #FFF;
+      font-size: 22px;
+      font-weight: bold;
+      border: none;
+      padding: 12px 36px;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(76, 175, 80, 0.4);
+      margin: 8px;
+    }
+    .btn-sub {
+      background: #FFA000;
+      color: #FFF;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      padding: 10px 28px;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(255, 160, 0, 0.3);
+      margin: 8px;
+    }
+    .btn-close {
+      background: #BDBDBD;
+      color: #FFF;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      padding: 8px 20px;
+      border-radius: 16px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    /* 首页覆盖层 */
+    #start-screen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, #FFF9E6 0%, #FFE082 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      transition: opacity 0.3s;
+    }
+    #start-screen.hidden { opacity: 0; pointer-events: none; }
+    .title-logo {
+      font-size: 76px;
+      font-weight: 900;
+      color: #FF6F00;
+      text-shadow: 0 6px 0 #FFE082, 0 10px 20px rgba(255, 111, 0, 0.3);
+      margin-bottom: 8px;
+      animation: bounceTitle 1.8s infinite ease-in-out;
+    }
+    @keyframes bounceTitle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .title-subtitle {
+      font-size: 22px;
+      color: #6D4C41;
+      font-weight: bold;
+      margin-bottom: 18px;
+    }
+    .grade-pill-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 22px;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 8px 18px;
+      border-radius: 22px;
+      border: 2px solid #FFE082;
+      box-shadow: 0 4px 12px rgba(255, 179, 0, 0.15);
+    }
+    .grade-label {
+      font-size: 14px;
+      color: #795548;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+    .grade-btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-grade {
+      background: #FFF;
+      border: 2px solid #FFCA28;
+      color: #6D4C41;
+      font-size: 15px;
+      font-weight: bold;
+      padding: 6px 14px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-grade:hover {
+      transform: translateY(-2px);
+    }
+    .btn-grade.active {
+      background: linear-gradient(135deg, #FFA000, #FF6F00);
+      color: #FFF;
+      border-color: #FF6F00;
+      box-shadow: 0 3px 10px rgba(255, 111, 0, 0.4);
+      transform: scale(1.06);
+    }
+    .btn-start-huge {
+      background: linear-gradient(180deg, #66BB6A 0%, #388E3C 100%);
+      color: #FFF;
+      font-size: 38px;
+      font-weight: 900;
+      border: 5px solid #FFF;
+      padding: 16px 80px;
+      border-radius: 50px;
+      box-shadow: 0 10px 25px rgba(56, 142, 60, 0.45);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .btn-start-huge:active { transform: scale(0.95); }
+    .start-nav-row {
+      display: flex;
+      gap: 20px;
+      margin-top: 32px;
+    }
+
+    /* 图鉴小卡片 */
+    .monster-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin: 20px 0;
+      max-height: 320px;
+      overflow-y: auto;
+    }
+    .monster-card {
+      background: #F5F5F5;
+      border: 3px solid #E0E0E0;
+      border-radius: 20px;
+      padding: 14px 10px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .monster-card.locked { opacity: 0.45; filter: grayscale(1); }
+    .monster-icon { font-size: 52px; margin-bottom: 6px; }
+    .monster-name { font-size: 16px; font-weight: bold; color: #333; }
+    .monster-desc { font-size: 12px; color: #777; margin-top: 4px; }
+
+    /* 家长门禁算术题选项 */
+    .gate-opts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 24px;
+    }
+    .btn-gate-opt {
+      background: #E3F2FD;
+      border: 3px solid #90CAF9;
+      border-radius: 16px;
+      font-size: 26px;
+      font-weight: bold;
+      color: #1976D2;
+      padding: 14px;
+      cursor: pointer;
+    }
+    .btn-gate-opt:active { background: #BBDEFB; }
+
+    /* 家长看板表格 */
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0;
+      font-size: 14px;
+      text-align: left;
+      max-height: 240px;
+      display: block;
+      overflow-y: auto;
+    }
+    .stats-table th, .stats-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #EEE;
+    }
+    .stats-table th { background: #FFF3E0; color: #E65100; }
+
+    /* 手机竖屏与小屏幕专属响应式优化 (直接竖屏畅玩，零配置) */
+    @media (orientation: portrait), (max-aspect-ratio: 1/1) {
+      #game-container:not(.in-page-rotated) {
+        width: 100vw;
+        height: 100dvh;
+        max-height: 100dvh;
+        max-width: 100vw;
+        aspect-ratio: unset;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      .hud {
+        height: 58px;
+        padding: 0 14px;
+      }
+      .hud-left, .hud-center, .hud-right {
+        gap: 8px;
+      }
+      .badge {
+        font-size: 15px;
+        padding: 6px 14px;
+        border-radius: 16px;
+        white-space: nowrap;
+      }
+      .combo-badge {
+        font-size: 15px;
+        padding: 5px 12px;
+        border-radius: 14px;
+      }
+      .btn-hud {
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 12px;
+      }
+      .btn-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 19px;
+      }
+
+      #start-screen {
+        padding: 24px 20px;
+        justify-content: space-evenly;
+      }
+      .title-logo {
+        font-size: 48px;
+        margin-bottom: 6px;
+        text-shadow: 0 4px #FFE082, 0 8px 16px rgba(255,111,0,0.35);
+      }
+      .title-subtitle {
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+      .grade-pill-box {
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 380px;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 6px 18px rgba(255, 179, 0, 0.2);
+      }
+      .grade-label {
+        font-size: 13px;
+        margin-bottom: 10px;
+        color: #6D4C41;
+      }
+      .grade-btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+      .btn-grade {
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 14px;
+      }
+      .btn-start-huge {
+        font-size: 28px;
+        padding: 14px 56px;
+        border-width: 4px;
+        border-radius: 36px;
+        box-shadow: 0 8px 22px rgba(56, 142, 60, 0.45);
+        margin: 10px 0;
+      }
+      .start-nav-row {
+        margin-top: 14px;
+        gap: 12px;
+        width: 100%;
+        justify-content: center;
+      }
+      .btn-sub {
+        font-size: 14px;
+        padding: 8px 18px;
+        margin: 0;
+        border-radius: 18px;
+      }
+
+      #big-word-popup {
+        padding: 18px 44px;
+        border-width: 6px;
+        border-radius: 28px;
+      }
+      #big-word-pinyin { font-size: 26px; }
+      #big-word-char { font-size: 96px; line-height: 1.1; }
+      #big-word-pts { font-size: 20px; margin-top: 4px; }
+
+      .card {
+        padding: 22px 20px;
+        border-radius: 24px;
+        max-width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+      }
+      .card h2 {
+        font-size: 24px !important;
+        margin-bottom: 12px !important;
+      }
+      .card p { font-size: 14px !important; }
+      .btn-main {
+        font-size: 18px;
+        padding: 10px 30px;
+        margin: 6px;
+        border-radius: 22px;
+      }
+      .btn-close {
+        font-size: 14px;
+        padding: 6px 18px;
+        margin-top: 10px;
+      }
+      .monster-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        max-height: 220px;
+        margin: 12px 0;
+      }
+      .monster-card {
+        padding: 10px 6px;
+        border-radius: 16px;
+      }
+      .monster-icon {
+        font-size: 38px;
+        margin-bottom: 4px;
+      }
+      .monster-name { font-size: 13px; }
+      .monster-desc { font-size: 11px; display: block; }
+      .gate-opts {
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .btn-gate-opt {
+        padding: 10px;
+        font-size: 20px;
+        border-radius: 14px;
+      }
+      .stats-table {
+        max-height: 200px;
+        font-size: 13px;
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <!-- 顶部 HUD 栏 (精简优化：左关卡，中得分与连击，右圆球图标按键) -->
+    <div class="hud" id="game-hud" style="display:none;">
+      <div class="hud-left">
+        <div class="badge" id="level-badge">第 1 关</div>
+      </div>
+      <div class="hud-center">
+        <div class="badge" style="background:#29B6F6;" id="score-badge">得分: 0</div>
+        <div class="combo-badge" id="combo-badge">连击 x2!</div>
+      </div>
+      <div class="hud-right">
+        <button class="btn-icon" id="sound-btn" title="声音开关">🔊</button>
+        <button class="btn-icon" id="pause-btn" title="暂停游戏">⏸</button>
+      </div>
+    </div>
+
+    <!-- 首页开始界面 -->
+    <div id="start-screen">
+      <div class="title-logo">★ 弹弹识字 ★</div>
+      <div class="title-subtitle">动动小手弹一弹，快乐认字每一天</div>
+      <button class="btn-start-huge" id="btn-start-game">▶ 开 始</button>
+      <div class="start-nav-row">
+        <button class="btn-sub" id="btn-open-monsters">🏆 小怪兽图鉴</button>
+        <button class="btn-sub" style="background:#42A5F5;" id="btn-open-parent">👨‍👩‍👦 家长中心</button>
+        <button class="btn-sub btn-rotate-toggle" style="background:#8E24AA;" id="btn-rotate-start">🔄 横屏模式</button>
+      </div>
+    </div>
+
+    <!-- 命中浮现大字 -->
+    <div id="big-word-popup">
+      <div id="big-word-pinyin">shān</div>
+      <div id="big-word-char">山</div>
+      <div id="big-word-pts">+10 命中!</div>
+    </div>
+
+    <!-- 暂停弹窗 -->
+    <div class="modal-mask" id="pause-modal">
+      <div class="card">
+        <h2 style="font-size:32px; color:#FFA000; margin-bottom:20px;">游戏暂停</h2>
+        <button class="btn-main" id="btn-resume">▶ 继续游戏</button><br>
+        <button class="btn-sub" id="btn-restart-level">🔄 重新开始本关</button><br>
+        <div style="display:flex; gap:10px; justify-content:center; margin:10px 0;">
+          <button class="btn-sub btn-rotate-toggle" id="btn-rotate-hud" style="background:#8E24AA; margin:0;">🔄 切换横屏</button>
+        </div>
+        <button class="btn-sub" style="background:#8D6E63;" id="btn-quit-to-menu">🏠 返回主菜单</button>
+      </div>
+    </div>
+
+    <!-- 通关结算弹窗 -->
+    <div class="modal-mask" id="win-modal">
+      <div class="card">
+        <h2 style="font-size:36px; color:#FFA000;">★ 太 棒 啦 ！★</h2>
+        <div style="font-size:54px; margin: 16px 0; color:#FFD700;">⭐⭐⭐</div>
+        <p style="font-size:22px; color:#5D4037; font-weight:bold;" id="win-summary">掌握汉字！</p>
+        <p style="font-size:16px; color:#4CAF50; margin:10px 0;" id="win-unlocked-tip"></p>
+        <button class="btn-main" id="modal-next-btn">下一关 ➔</button><br>
+        <button class="btn-close" id="modal-retry-btn">再玩一次</button>
+      </div>
+    </div>
+
+    <!-- 小怪兽图鉴弹窗 -->
+    <div class="modal-mask" id="monster-modal">
+      <div class="card" style="width: 580px;">
+        <h2 style="font-size:30px; color:#FFA000;">🏆 弹弹小怪兽图鉴</h2>
+        <p style="font-size:15px; color:#777; margin-top:4px;" id="monster-counter">已收集: 1 / 5</p>
+        <div class="monster-grid" id="monster-list"></div>
+        <button class="btn-close" id="btn-close-monsters">关 闭</button>
+      </div>
+    </div>
+
+    <!-- 家长门禁验证题弹窗 -->
+    <div class="modal-mask" id="gate-modal">
+      <div class="card">
+        <h2 style="font-size:26px; color:#1976D2;">👨‍👩‍👦 家长防误触验证</h2>
+        <p style="font-size:15px; color:#666; margin-top:6px;">请计算以下算式以进入家长模式：</p>
+        <p style="font-size:24px; font-weight:bold; color:#E65100; margin:20px 0;" id="gate-question">三 乘以 四 等于几？</p>
+        <div class="gate-opts" id="gate-options"></div>
+        <button class="btn-close" id="btn-close-gate">返回</button>
+      </div>
+    </div>
+
+    <!-- 家长数据看板弹窗 -->
+    <div class="modal-mask" id="parent-modal">
+      <div class="card" style="width:620px;">
+        <h2 style="font-size:28px; color:#1976D2;">📊 识字学习与字库中心</h2>
+        <p style="font-size:15px; color:#5D4037; margin:6px 0;" id="parent-summary-text">今日识字记录</p>
+        <div style="background:#FAFAFA; border:1px solid #EEE; border-radius:12px; padding:10px; margin:10px 0;">
+          <label style="font-size:15px; color:#333; font-weight:bold;">
+            <input type="checkbox" checked disabled> 《小羊上山》第 2 册 (20字高频启蒙)
+          </label>
+        </div>
+        <table class="stats-table">
+          <thead>
+            <tr><th>汉字</th><th>曝光</th><th>正确</th><th>易错</th><th>命中率</th></tr>
+          </thead>
+          <tbody id="stats-tbody"></tbody>
+        </table>
+        <button class="btn-close" id="btn-close-parent">完成退出</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+
+// --- 汉字库与拼音词典 (全套 5 级 300 核心汉字) ---
+const VOCAB_TIERS = {
+  1: {
+    title: "第 1 级 · 启蒙基础",
+    desc: "数词、自然天地、身体动作与亲人",
+    words: [
+      "一", "二", "三", "四", "五", "六", "七", "八", "九", "十",
+      "两", "只", "头", "又", "了", "不", "大", "小", "上", "下",
+      "多", "少", "白", "天", "云", "山", "太", "阳", "月", "亮",
+      "星", "马", "牛", "羊", "兔", "虫", "鸟", "花", "草", "树",
+      "地", "吃", "看", "走", "笑", "来", "飞", "爱", "是", "跑",
+      "跳", "高", "兴", "快", "乐", "好", "的", "爸", "妈", "我"
+    ]
+  },
+  2: {
+    title: "第 2 级 · 探索世界",
+    desc: "代词、四季气候、常见动物与生活色彩",
+    words: [
+      "他", "她", "它", "们", "在", "有", "里", "外", "去", "见",
+      "听", "玩", "哭", "起", "喝", "到", "河", "海", "风", "雨",
+      "雪", "春", "夏", "秋", "冬", "鱼", "狼", "猫", "狗", "蝴",
+      "蝶", "蜜", "蜂", "谢", "睡", "红", "蓝", "绿", "黄", "黑",
+      "美", "丽", "水", "火", "木", "土", "金", "门", "车", "书",
+      "学", "坐", "立", "出", "入", "老", "师", "朋", "友", "做"
+    ]
+  },
+  3: {
+    title: "第 3 级 · 认知表达",
+    desc: "家庭成员、身体部位、疑问词与特征反义词",
+    words: [
+      "你", "这", "么", "什", "谁", "哪", "个", "得", "能", "想",
+      "说", "话", "叫", "问", "答", "家", "儿", "子", "女", "哥",
+      "姐", "弟", "妹", "爷", "奶", "眼", "耳", "口", "鼻", "手",
+      "足", "身", "心", "早", "中", "晚", "现", "在", "真", "很",
+      "太", "没", "别", "给", "把", "让", "找", "帮", "变", "动",
+      "开", "关", "长", "短", "方", "圆", "轻", "重", "新", "旧"
+    ]
+  },
+  4: {
+    title: "第 4 级 · 逻辑空间",
+    desc: "方位定向、动作指令、身体感受与逻辑连接",
+    words: [
+      "北", "南", "东", "西", "向", "朝", "左", "右", "前", "后",
+      "穿", "戴", "拿", "放", "推", "拉", "送", "带", "迎", "追",
+      "快", "慢", "冷", "热", "干", "净", "脏", "饱", "饿", "渴",
+      "病", "痛", "累", "难", "易", "对", "错", "反", "正", "同",
+      "空", "间", "旁", "边", "角", "转", "回", "始", "终", "发",
+      "现", "以", "为", "因", "所", "果", "如", "常", "样"
+    ]
+  },
+  5: {
+    title: "第 5 级 · 丰富表达",
+    desc: "量词度量、五味感官、形态细节与事理法则",
+    words: [
+      "点", "线", "面", "片", "块", "条", "张", "支", "本", "座",
+      "间", "处", "所", "色", "形", "声", "光", "影", "气", "味",
+      "香", "臭", "酸", "甜", "苦", "辣", "咸", "始", "初", "深",
+      "浅", "硬", "软", "粗", "细", "厚", "薄", "轻", "重", "直",
+      "弯", "闭", "睁", "抓", "握", "爬", "跳", "游", "飞", "行",
+      "住", "立", "停", "等", "候", "迎", "送", "接", "通", "过",
+      "达", "成", "办", "法", "意", "思", "主", "题", "故", "事",
+      "情", "理", "道", "路", "步", "桥", "舟", "车"
+    ]
+  }
+};
+const PINYIN_DICT = {
+  // 第 1 级
+  "一": "yī", "二": "èr", "三": "sān", "四": "sì", "五": "wǔ", "六": "liù", "七": "qī", "八": "bā", "九": "jiǔ", "十": "shí",
+  "两": "liǎng", "只": "zhī", "头": "tóu", "又": "yòu", "了": "le", "不": "bù", "大": "dà", "小": "xiǎo", "上": "shàng", "下": "xià",
+  "多": "duō", "少": "shǎo", "白": "bái", "天": "tiān", "云": "yún", "山": "shān", "太": "tài", "阳": "yáng", "月": "yuè", "亮": "liàng",
+  "星": "xīng", "马": "mǎ", "牛": "niú", "羊": "yáng", "兔": "tù", "虫": "chóng", "鸟": "niǎo", "花": "huā", "草": "cǎo", "树": "shù",
+  "地": "dì", "吃": "chī", "看": "kàn", "走": "zǒu", "笑": "xiào", "来": "lái", "飞": "fēi", "爱": "ài", "是": "shì", "跑": "pǎo",
+  "跳": "tiào", "高": "gāo", "兴": "xìng", "快": "kuài", "乐": "lè", "好": "hǎo", "的": "de", "爸": "bà", "妈": "mā", "我": "wǒ",
+
+  // 第 2 级
+  "他": "tā", "她": "tā", "它": "tā", "们": "men", "在": "zài", "有": "yǒu", "里": "lǐ", "外": "wài", "去": "qù", "见": "jiàn",
+  "听": "tīng", "玩": "wán", "哭": "kū", "起": "qǐ", "喝": "hē", "到": "dào", "河": "hé", "海": "hǎi", "风": "fēng", "雨": "yǔ",
+  "雪": "xuě", "春": "chūn", "夏": "xià", "秋": "qiū", "冬": "dōng", "鱼": "yú", "狼": "láng", "猫": "māo", "狗": "gǒu", "蝴": "hú",
+  "蝶": "dié", "蜜": "mì", "蜂": "fēng", "谢": "xiè", "睡": "shuì", "红": "hóng", "蓝": "lán", "绿": "lǜ", "黄": "huáng", "黑": "hēi",
+  "美": "měi", "丽": "lì", "水": "shuǐ", "火": "huǒ", "木": "mù", "土": "tǔ", "金": "jīn", "门": "mén", "车": "chē", "书": "shū",
+  "学": "xué", "坐": "zuò", "立": "lì", "出": "chū", "入": "rù", "老": "lǎo", "师": "shī", "朋": "péng", "友": "yǒu", "做": "zuò",
+
+  // 第 3 级
+  "你": "nǐ", "这": "zhè", "么": "me", "什": "shén", "谁": "shuí", "哪": "nǎ", "个": "gè", "得": "dé", "能": "néng", "想": "xiǎng",
+  "说": "shuō", "话": "huà", "叫": "jiào", "问": "wèn", "答": "dá", "家": "jiā", "儿": "ér", "子": "zǐ", "女": "nǚ", "哥": "gē",
+  "姐": "jiě", "弟": "dì", "妹": "mèi", "爷": "yé", "奶": "nǎi", "眼": "yǎn", "耳": "ěr", "口": "kǒu", "鼻": "bí", "手": "shǒu",
+  "足": "zú", "身": "shēn", "心": "xīn", "早": "zǎo", "中": "zhōng", "晚": "wǎn", "现": "xiàn", "真": "zhēn", "很": "hěn",
+  "没": "méi", "别": "bié", "给": "gěi", "把": "bǎ", "让": "ràng", "找": "zhǎo", "帮": "bāng", "变": "biàn", "动": "dòng",
+  "开": "kāi", "关": "guān", "长": "cháng", "短": "duǎn", "方": "fāng", "圆": "yuán", "轻": "qīng", "重": "zhòng", "新": "xīn", "旧": "jiù",
+
+  // 第 4 级
+  "北": "běi", "南": "nán", "东": "dōng", "西": "xī", "向": "xiàng", "朝": "cháo", "左": "zuǒ", "右": "yòu", "前": "qián", "后": "hòu",
+  "穿": "chuān", "戴": "dài", "拿": "ná", "放": "fàng", "推": "tuī", "拉": "lā", "送": "sòng", "带": "dài", "迎": "yíng", "追": "zhuī",
+  "慢": "màn", "冷": "lěng", "热": "rè", "干": "gān", "净": "jìng", "脏": "zāng", "饱": "bǎo", "饿": "è", "渴": "kě",
+  "病": "bìng", "痛": "tòng", "累": "lèi", "难": "nán", "易": "yì", "对": "duì", "错": "cuò", "反": "fǎn", "正": "zhèng", "同": "tóng",
+  "空": "kōng", "间": "jiān", "旁": "páng", "边": "biān", "角": "jiǎo", "转": "zhuǎn", "回": "huí", "始": "shǐ", "终": "zhōng", "发": "fā",
+  "以": "yǐ", "为": "wéi", "因": "yīn", "所": "suǒ", "果": "guǒ", "如": "rú", "常": "cháng", "样": "yàng",
+
+  // 第 5 级
+  "点": "diǎn", "线": "xiàn", "面": "miàn", "片": "piàn", "块": "kuài", "条": "tiáo", "张": "zhāng", "支": "zhī", "本": "běn", "座": "zuò",
+  "处": "chù", "色": "sè", "形": "xíng", "声": "shēng", "光": "guāng", "影": "yǐng", "气": "qì", "味": "wèi",
+  "香": "xiāng", "臭": "chòu", "酸": "suān", "甜": "tián", "苦": "kǔ", "辣": "là", "咸": "xián", "初": "chū", "深": "shēn",
+  "浅": "qiǎn", "硬": "yìng", "软": "ruǎn", "粗": "cū", "细": "xì", "厚": "hòu", "薄": "báo", "直": "zhí",
+  "弯": "wān", "闭": "bì", "睁": "zhēng", "抓": "zhuā", "握": "wò", "爬": "pá", "游": "yóu", "行": "xíng",
+  "住": "zhù", "停": "tíng", "等": "děng", "候": "hòu", "接": "jiē", "通": "tōng", "过": "guò",
+  "达": "dá", "成": "chéng", "办": "bàn", "法": "fǎ", "意": "yì", "思": "sī", "主": "zhǔ", "题": "tí", "故": "gù", "事": "shì",
+  "情": "qíng", "理": "lǐ", "道": "dào", "路": "lù", "步": "bù", "桥": "qiáo", "舟": "zhōu"
+};
+
+function getWordPinyin(char) {
+  return PINYIN_DICT[char] || '';
+}
+
+// --- 艾宾浩斯动态关卡生成器 (自适应 1280x720 横屏 与 720x1280 竖屏) ---
+const EbbinghausEngine = {
+  WORDS_PER_LEVEL: 4,
+  MAX_REVIEW: 3,
+
+  getTotalLevelsInGrade(grade) {
+    const tier = VOCAB_TIERS[grade];
+    if (!tier) return 15;
+    return Math.ceil(tier.words.length / this.WORDS_PER_LEVEL);
+  },
+
+  getReviewWords(grade, levelIdx, stats) {
+    const tier = VOCAB_TIERS[grade];
+    if (!tier || levelIdx === 0) return [];
+
+    const learnedPool = [];
+    for (let l = 0; l < levelIdx; l++) {
+      const start = l * this.WORDS_PER_LEVEL;
+      const wList = tier.words.slice(start, start + this.WORDS_PER_LEVEL);
+      wList.forEach(w => learnedPool.push({ word: w, originLevel: l }));
+    }
+
+    if (grade > 1) {
+      for (let g = 1; g < grade; g++) {
+        const prevWords = VOCAB_TIERS[g]?.words || [];
+        prevWords.slice(-10).forEach(w => learnedPool.push({ word: w, originLevel: 0 }));
+      }
+    }
+
+    if (learnedPool.length === 0) return [];
+
+    const scoredPool = learnedPool.map(item => {
+      const wStat = stats[item.word] || { hits: 0, misses: 0, exposures: 0 };
+      const levelDiff = levelIdx - item.originLevel;
+      let weight = 1.0;
+      if (levelDiff === 1) weight += 2.5;
+      else if (levelDiff === 2 || levelDiff === 3) weight += 2.0;
+      else if (levelDiff >= 5) weight += 2.8;
+
+      if (wStat.misses > 0) weight += wStat.misses * 2.5;
+      if (wStat.hits === 0 && wStat.exposures > 0) weight += 3.0;
+
+      return { word: item.word, weight: weight * (0.8 + Math.random() * 0.4) };
+    });
+
+    scoredPool.sort((a, b) => b.weight - a.weight);
+    const selected = [];
+    const set = new Set();
+    const reviewCount = levelIdx === 1 ? 2 : (levelIdx % 2 === 0 ? 3 : 4);
+    for (const item of scoredPool) {
+      if (!set.has(item.word)) {
+        set.add(item.word);
+        selected.push(item.word);
+        if (selected.length >= reviewCount) break;
+      }
+    }
+    return selected;
+  },
+
+  generateLevel(grade, levelIdx, isPortrait) {
+    const tier = VOCAB_TIERS[grade] || VOCAB_TIERS[1];
+    const totalLevels = this.getTotalLevelsInGrade(grade);
+    const safeIdx = Math.max(0, Math.min(levelIdx, totalLevels - 1));
+
+    const startIdx = safeIdx * this.WORDS_PER_LEVEL;
+    const newWords = tier.words.slice(startIdx, startIdx + this.WORDS_PER_LEVEL);
+    const reviewWords = this.getReviewWords(grade, safeIdx, StorageSys.data.stats || {});
+
+    const targetWords = [...newWords, ...reviewWords];
+    const reviewSet = new Set(reviewWords);
+    const ballSequence = [...targetWords, ...targetWords].sort(() => Math.random() - 0.5);
+
+    const layoutPositions = isPortrait 
+      ? this.generatePortraitLayout(targetWords.length)
+      : this.generateLandscapeLayout(targetWords.length);
+
+    const blocks = [];
+    targetWords.forEach((word, idx) => {
+      const pos = layoutPositions[idx];
+      blocks.push({
+        id: 't_' + idx + '_' + word,
+        type: 'TARGET',
+        word,
+        x: pos.x,
+        y: pos.y,
+        width: 84,
+        height: 84,
+        shape: 'CIRCLE',
+        isReview: reviewSet.has(word)
+      });
+    });
+
+    if (safeIdx >= 1) {
+      if (isPortrait) {
+        if (safeIdx % 2 === 1) {
+          blocks.push({ id: 'bmp_center', type: 'BUMPER', x: 0, y: -140, width: 70, height: 70, shape: 'CIRCLE' });
+        } else {
+          blocks.push({ id: 'bmp_left', type: 'BUMPER', x: -160, y: -120, width: 64, height: 64, shape: 'CIRCLE' });
+          blocks.push({ id: 'bmp_right', type: 'BUMPER', x: 160, y: -120, width: 64, height: 64, shape: 'CIRCLE' });
+        }
+      } else {
+        if (safeIdx % 2 === 1) {
+          blocks.push({ id: 'bmp_center', type: 'BUMPER', x: 0, y: -20, width: 70, height: 70, shape: 'CIRCLE' });
+        } else {
+          blocks.push({ id: 'bmp_left', type: 'BUMPER', x: -320, y: 40, width: 68, height: 68, shape: 'CIRCLE' });
+          blocks.push({ id: 'bmp_right', type: 'BUMPER', x: 320, y: 40, width: 68, height: 68, shape: 'CIRCLE' });
+        }
+      }
+    }
+
+    return {
+      grade,
+      levelId: safeIdx + 1,
+      title: `${tier.title} - 第 ${safeIdx + 1} 课`,
+      targetWords,
+      ballSequence,
+      blocks
+    };
+  },
+
+  generatePortraitLayout(count) {
+    const positions = [];
+    if (count <= 4) {
+      const xs = [-120, 120];
+      const ys = [360, 180];
+      for (const y of ys) {
+        for (const x of xs) {
+          if (positions.length < count) positions.push({ x, y });
+        }
+      }
+    } else if (count === 5) {
+      positions.push({ x: -190, y: 370 }, { x: 0, y: 385 }, { x: 190, y: 370 }, { x: -105, y: 200 }, { x: 105, y: 200 });
+    } else if (count === 6) {
+      positions.push({ x: -125, y: 410 }, { x: 125, y: 410 }, { x: -175, y: 260 }, { x: 175, y: 260 }, { x: -125, y: 120 }, { x: 125, y: 120 });
+    } else if (count === 7) {
+      positions.push({ x: -130, y: 420 }, { x: 130, y: 420 }, { x: -210, y: 280 }, { x: 0, y: 290 }, { x: 210, y: 280 }, { x: -130, y: 140 }, { x: 130, y: 140 });
+    } else {
+      positions.push({ x: -190, y: 430 }, { x: 0, y: 445 }, { x: 190, y: 430 }, { x: -115, y: 290 }, { x: 115, y: 290 }, { x: -190, y: 150 }, { x: 0, y: 165 }, { x: 190, y: 150 });
+    }
+    return positions;
+  },
+
+  generateLandscapeLayout(count) {
+    const positions = [];
+    if (count <= 4) {
+      const spacing = 180;
+      const startX = -((count - 1) * spacing) / 2;
+      for (let i = 0; i < count; i++) {
+        const x = startX + i * spacing;
+        positions.push({ x, y: 120 - Math.abs(x) * 0.12 });
+      }
+    } else if (count <= 6) {
+      const topCount = 3;
+      const btmCount = count - topCount;
+      const topStartX = -((topCount - 1) * 220) / 2;
+      for (let i = 0; i < topCount; i++) positions.push({ x: topStartX + i * 220, y: 160 });
+      const btmStartX = -((btmCount - 1) * 220) / 2;
+      for (let i = 0; i < btmCount; i++) positions.push({ x: btmStartX + i * 220, y: 30 });
+    } else {
+      const topCount = 4;
+      const btmCount = count - topCount;
+      const topStartX = -((topCount - 1) * 190) / 2;
+      for (let i = 0; i < topCount; i++) positions.push({ x: topStartX + i * 190, y: 175 });
+      const btmStartX = -((btmCount - 1) * 200) / 2;
+      for (let i = 0; i < btmCount; i++) positions.push({ x: btmStartX + i * 200, y: 35 });
+    }
+    return positions;
+  }
+};
+
+// --- 音频管理系统 (含 Web Speech API 双轨保底) ---
+const AudioSys = {
+  muted: false,
+  cache: {},
+  play(url) {
+    if (this.muted) return;
+    let a = this.cache[url];
+    if (!a) {
+      a = new Audio(url);
+      this.cache[url] = a;
+    }
+    a.currentTime = 0;
+    a.play().catch(e => console.warn('Audio play error:', e));
+  },
+  playWord(word) {
+    if (this.muted) return;
+    try {
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+        const utter = new SpeechSynthesisUtterance(word);
+        utter.lang = 'zh-CN';
+        utter.rate = 0.85;
+        utter.pitch = 1.1;
+        window.speechSynthesis.speak(utter);
+      }
+    } catch(e) {}
+  },
+  playSFX(name) { this.play(`assets/audio/sfx/${name}.wav`); },
+  playVoice(name) { this.play(`assets/audio/voice/${name}.wav`); }
+};
+
+// --- 用户数据与艾宾浩斯统计存储 ---
+const StorageSys = {
+  KEY: 'BOUNCE_LITERACY_PIXI_V2',
+  data: {
+    totalHits: 0,
+    currentGrade: 1,
+    currentLevel: 0,
+    unlockedMonsters: ['m_mushroom'],
+    starsPerLevel: {},
+    stats: {}
+  },
+  load() {
+    const raw = localStorage.getItem(this.KEY);
+    if (raw) {
+      try { this.data = Object.assign(this.data, JSON.parse(raw)); } catch(e) {}
+    }
+    if (!this.data.currentGrade) this.data.currentGrade = 1;
+    if (this.data.currentLevel === undefined) this.data.currentLevel = 0;
+  },
+  save() {
+    localStorage.setItem(this.KEY, JSON.stringify(this.data));
+  },
+  setGrade(grade) {
+    this.data.currentGrade = grade;
+    this.data.currentLevel = 0;
+    this.save();
+  },
+  recordHit(word, grade, level) {
+    this.data.totalHits++;
+    if (!this.data.stats[word]) this.data.stats[word] = { hits: 0, misses: 0, exposures: 0 };
+    this.data.stats[word].hits++;
+    this.data.stats[word].exposures++;
+    this.data.stats[word].lastGrade = grade;
+    this.data.stats[word].lastLevel = level;
+    this.checkUnlocks(grade, level);
+    this.save();
+  },
+  recordMiss(word) {
+    if (!this.data.stats[word]) this.data.stats[word] = { hits: 0, misses: 0, exposures: 0 };
+    this.data.stats[word].misses++;
+    this.data.stats[word].exposures++;
+    this.save();
+  },
+  recordLevelWin(grade, levelId, stars) {
+    const key = `${grade}_${levelId}`;
+    const old = this.data.starsPerLevel[key] || 0;
+    if (stars > old) this.data.starsPerLevel[key] = stars;
+    this.data.currentLevel = levelId + 1;
+    this.checkUnlocks(grade, levelId);
+    this.save();
+  },
+  checkUnlocks(curGrade, curLevel) {
+    if (this.data.totalHits >= 3 && !this.data.unlockedMonsters.includes('m_star')) {
+      this.data.unlockedMonsters.push('m_star');
+    }
+    if ((curLevel >= 3 || curGrade >= 2) && !this.data.unlockedMonsters.includes('m_turtle')) {
+      this.data.unlockedMonsters.push('m_turtle');
+    }
+    if (this.data.totalHits >= 12 && !this.data.unlockedMonsters.includes('m_cloud')) {
+      this.data.unlockedMonsters.push('m_cloud');
+    }
+    if (this.data.totalHits >= 25 && !this.data.unlockedMonsters.includes('m_lion')) {
+      this.data.unlockedMonsters.push('m_lion');
+    }
+    if (this.data.totalHits >= 50 && !this.data.unlockedMonsters.includes('m_dragon')) {
+      this.data.unlockedMonsters.push('m_dragon');
+    }
+  },
+  getRetentionRate() {
+    const words = Object.keys(this.data.stats);
+    if (words.length === 0) return 100;
+    let total = 0;
+    for (const w of words) {
+      const s = this.data.stats[w];
+      total += (s.hits / (s.exposures || 1));
+    }
+    return Math.round((total / words.length) * 100);
+  }
+};
+
+// --- 小怪兽图鉴数据 ---
+const MONSTERS = [
+  { id: 'm_mushroom', name: '弹弹红菇', icon: '🍄', desc: '初入游戏即获' },
+  { id: 'm_star', name: '闪光星仔', icon: '⭐', desc: '累计消除 3 个字' },
+  { id: 'm_turtle', name: '坚果萌龟', icon: '🐢', desc: '通过第 4 关或第 2 级' },
+  { id: 'm_cloud', name: '悠悠棉花云', icon: '☁️', desc: '累计消除 12 个字' },
+  { id: 'm_lion', name: '威风识字狮', icon: '🦁', desc: '累计消除 25 个字' },
+  { id: 'm_dragon', name: '金翼智慧龙', icon: '🐲', desc: '累计消除 50 个字' }
+];
+
+let curGrade = 1;
+let curLevelIdx = 0;
+let curConfig = null;
+let isPortrait = false;
+
+// --- 游戏物理世界与状态 ---
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+let ANCHOR_X = 640;
+let ANCHOR_Y = 580;
+const MAX_DRAG = 90;
+const LAUNCH_IMPULSE_RATIO = 5.2;
+const MAX_SPEED = 520;
+const MIN_SPEED = 280;
+
+let ball = null;
+let blocks = [];
+let ballQueue = [];
+let remainingTargets = new Set();
+let score = 0;
+let combo = 0;
+let missCount = 0;
+let isDragging = false;
+let dragPos = { x: ANCHOR_X, y: ANCHOR_Y };
+let activeWeakHint = false;
+let isPlaying = false;
+
+function checkOrientation() {
+  isPortrait = window.innerHeight > window.innerWidth;
+  const screenW = window.innerWidth || 360;
+  const screenH = window.innerHeight || 640;
+  canvas.width = isPortrait ? 720 : 1280;
+  canvas.height = isPortrait ? Math.round(720 * (screenH / screenW)) : 720;
+  ANCHOR_X = isPortrait ? 360 : 640;
+  ANCHOR_Y = isPortrait ? (canvas.height - 160) : 580;
+  dragPos = { x: ANCHOR_X, y: ANCHOR_Y };
+  if (isPlaying) {
+    loadLevel(curLevelIdx, curGrade);
+  }
+}
+
+async function init() {
+  StorageSys.load();
+  curGrade = StorageSys.data.currentGrade || 1;
+  curLevelIdx = StorageSys.data.currentLevel || 0;
+  
+  checkOrientation();
+  setupUI();
+  setupInput();
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
+  requestAnimationFrame(gameLoop);
+}
+
+function updateGradeButtons() {
+  const g = StorageSys.data.currentGrade || 1;
+  document.querySelectorAll('.btn-grade').forEach(el => {
+    const val = parseInt(el.getAttribute('data-grade') || '1');
+    el.classList.toggle('active', val === g);
+  });
+
+  const tips = {
+    1: "第 1 级 · 启蒙基础 (数词、自然天地、身体动作与亲人)",
+    2: "第 2 级 · 探索世界 (代词、四季气候、常见动物与生活色彩)",
+    3: "第 3 级 · 认知表达 (家庭成员、身体部位、疑问词与特征反义词)",
+    4: "第 4 级 · 逻辑空间 (方位定向、动作指令、身体感受与逻辑连接)",
+    5: "第 5 级 · 丰富表达 (量词度量、五味感官、形态细节与事理法则)"
+  };
+  const tipEl = document.getElementById('grade-tip-text');
+  if (tipEl) tipEl.innerText = tips[g] || tips[1];
+}
+
+function setupUI() {
+  updateGradeButtons();
+  const setupGroup = (id) => {
+    const c = document.getElementById(id);
+    if (!c) return;
+    c.querySelectorAll('.btn-grade').forEach(btn => {
+      btn.onclick = () => {
+        AudioSys.playSFX('sfx_click');
+        const g = parseInt(btn.getAttribute('data-grade') || '1');
+        StorageSys.setGrade(g);
+        curGrade = g;
+        curLevelIdx = 0;
+        updateGradeButtons();
+      };
+    });
+  };
+  setupGroup('grade-btn-group');
+  setupGroup('parent-grade-btn-group');
+
+  document.getElementById('btn-start-game').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('start-screen').classList.add('hidden');
+    document.getElementById('game-hud').style.display = 'flex';
+    isPlaying = true;
+    loadLevel(curLevelIdx, curGrade);
+  };
+
+  document.getElementById('pause-btn').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('pause-modal').classList.add('show');
+  };
+  document.getElementById('btn-resume').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('pause-modal').classList.remove('show');
+  };
+  document.getElementById('btn-restart-level').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('pause-modal').classList.remove('show');
+    loadLevel(curLevelIdx, curGrade);
+  };
+  document.getElementById('btn-quit-to-menu').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('pause-modal').classList.remove('show');
+    document.getElementById('game-hud').style.display = 'none';
+    document.getElementById('start-screen').classList.remove('hidden');
+    isPlaying = false;
+    ball = null;
+  };
+
+  const soundBtn = document.getElementById('sound-btn');
+  if (soundBtn) {
+    soundBtn.onclick = () => {
+      AudioSys.muted = !AudioSys.muted;
+      soundBtn.innerText = AudioSys.muted ? '🔇' : '🔊';
+      soundBtn.title = AudioSys.muted ? '开启声音' : '静音';
+    };
+  }
+
+  document.getElementById('modal-next-btn').onclick = () => {
+    document.getElementById('win-modal').classList.remove('show');
+    const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(curGrade);
+    if (curLevelIdx + 1 < totalInGrade) {
+      loadLevel(curLevelIdx + 1, curGrade);
+    } else {
+      if (curGrade < 5) {
+        const nextG = curGrade + 1;
+        alert(`🎉 太棒了！已顺利通关第 ${curGrade} 级！即将进入【第 ${nextG} 级】新词汇挑战！`);
+        StorageSys.setGrade(nextG);
+        curGrade = nextG;
+        loadLevel(0, nextG);
+      } else {
+        alert('👑 终极大满贯！你已经成功通关了全部 5 个等级共 300 个汉字！艾宾浩斯记忆大师！');
+        document.getElementById('start-screen').classList.remove('hidden');
+        document.getElementById('game-hud').style.display = 'none';
+        isPlaying = false;
+      }
+    }
+  };
+  document.getElementById('modal-retry-btn').onclick = () => {
+    document.getElementById('win-modal').classList.remove('show');
+    loadLevel(curLevelIdx, curGrade);
+  };
+
+  document.getElementById('btn-open-monsters').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    renderMonsters();
+    document.getElementById('monster-modal').classList.add('show');
+  };
+  document.getElementById('btn-close-monsters').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('monster-modal').classList.remove('show');
+  };
+
+  document.getElementById('btn-open-parent').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    openParentGate();
+  };
+  document.getElementById('btn-close-gate').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('gate-modal').classList.remove('show');
+  };
+  document.getElementById('btn-close-parent').onclick = () => {
+    AudioSys.playSFX('sfx_click');
+    document.getElementById('parent-modal').classList.remove('show');
+  };
+}
+
+function renderMonsters() {
+  const container = document.getElementById('monster-list');
+  container.innerHTML = '';
+  let unlocked = 0;
+  MONSTERS.forEach(m => {
+    const isUnlocked = StorageSys.data.unlockedMonsters.includes(m.id);
+    if (isUnlocked) unlocked++;
+    const card = document.createElement('div');
+    card.className = `monster-card ${isUnlocked ? '' : 'locked'}`;
+    card.innerHTML = `
+      <div class="monster-icon">${m.icon}</div>
+      <div class="monster-name">${m.name}</div>
+      <div class="monster-desc">${isUnlocked ? '已解锁' : m.desc}</div>
+    `;
+    if (isUnlocked) {
+      card.onclick = () => AudioSys.playSFX('sfx_bumper');
+    }
+    container.appendChild(card);
+  });
+  document.getElementById('monster-counter').innerText = `已收集: ${unlocked} / ${MONSTERS.length}`;
+}
+
+function openParentGate() {
+  const numWords = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+  const a = Math.floor(Math.random() * 5) + 2;
+  const b = Math.floor(Math.random() * 5) + 2;
+  const ans = a * b;
+  document.getElementById('gate-question').innerText = `${numWords[a]} 乘以 ${numWords[b]} 等于几？`;
+
+  const opts = new Set([ans]);
+  while (opts.size < 4) {
+    opts.add(ans + Math.floor(Math.random() * 11) - 5);
+  }
+  const arr = Array.from(opts).sort(() => Math.random() - 0.5);
+
+  const optContainer = document.getElementById('gate-options');
+  optContainer.innerHTML = '';
+  arr.forEach(num => {
+    const btn = document.createElement('button');
+    btn.className = 'btn-gate-opt';
+    btn.innerText = num;
+    btn.onclick = () => {
+      if (num === ans) {
+        AudioSys.playSFX('sfx_match');
+        document.getElementById('gate-modal').classList.remove('show');
+        openParentReport();
+      } else {
+        AudioSys.playSFX('sfx_mismatch');
+        openParentGate();
+      }
+    };
+    optContainer.appendChild(btn);
+  });
+
+  document.getElementById('gate-modal').classList.add('show');
+}
+
+function openParentReport() {
+  updateGradeButtons();
+  const tbody = document.getElementById('stats-tbody');
+  tbody.innerHTML = '';
+  const stats = StorageSys.data.stats || {};
+  let totalHits = 0;
+  const chars = Object.keys(stats);
+  chars.forEach(char => {
+    const item = stats[char];
+    totalHits += item.hits;
+    const rate = Math.round((item.hits / (item.exposures || 1)) * 100);
+    const py = getWordPinyin(char);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><strong>${char}</strong></td>
+      <td style="color:#FFA000; font-weight:bold;">${py}</td>
+      <td>${item.exposures}</td>
+      <td><span style="color:#4CAF50;">${item.hits}</span></td>
+      <td><span style="color:#F44336;">${item.misses}</span></td>
+      <td><strong>${rate}%</strong></td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  const retention = StorageSys.getRetentionRate();
+  const retEl = document.getElementById('parent-retention-rate');
+  if (retEl) {
+    retEl.innerText = `艾宾浩斯记忆留存率: ${retention}% (${retention >= 85 ? '🌟 记忆稳固' : retention >= 65 ? '👍 良好' : '💪 需多轮巩固'})`;
+  }
+  document.getElementById('parent-summary-text').innerText = `累计消除练习: ${totalHits} 次 | 已掌握汉字: ${chars.length} 个`;
+  document.getElementById('parent-modal').classList.add('show');
+}
+
+function loadLevel(idx, grade) {
+  if (grade !== undefined) curGrade = grade;
+  curLevelIdx = idx;
+  curConfig = EbbinghausEngine.generateLevel(curGrade, curLevelIdx, isPortrait);
+  remainingTargets = new Set(curConfig.targetWords);
+  ballQueue = [...curConfig.ballSequence];
+  combo = 0;
+  missCount = 0;
+  activeWeakHint = false;
+
+  const titleBadge = document.getElementById('level-badge');
+  if (titleBadge) {
+    if (isPortrait) {
+      titleBadge.innerText = `第 ${curLevelIdx + 1} 关`;
+    } else {
+      titleBadge.innerText = `第${curGrade}级 第${curLevelIdx + 1}关`;
+    }
+  }
+  document.getElementById('combo-badge').style.display = 'none';
+
+  const centerX = isPortrait ? 360 : 640;
+  const centerY = isPortrait ? Math.round(canvas.height * 0.42) : 360;
+
+  blocks = curConfig.blocks.map(b => ({
+    id: b.id,
+    type: b.type,
+    word: b.word,
+    x: centerX + b.x,
+    y: centerY - b.y,
+    w: b.width || 84,
+    h: b.height || 84,
+    shape: b.shape || 'CIRCLE',
+    rotation: (b.rotation || 0) * Math.PI / 180,
+    eliminated: false,
+    shake: 0,
+    isReview: b.isReview
+  }));
+
+  spawnNextBall();
+}
+
+function spawnNextBall() {
+  let word = ballQueue.shift();
+  if (!word) {
+    if (remainingTargets.size > 0) {
+      const arr = Array.from(remainingTargets);
+      word = arr[Math.floor(Math.random() * arr.length)];
+    } else {
+      return;
+    }
+  }
+  ball = {
+    word,
+    x: ANCHOR_X,
+    y: ANCHOR_Y,
+    r: 42,
+    vx: 0,
+    vy: 0,
+    state: 'IDLE',
+    bounces: 0,
+    launchTime: 0
+  };
+  dragPos = { x: ANCHOR_X, y: ANCHOR_Y };
+}
+
+function setupInput() {
+  const getPos = e => {
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: ((clientX - rect.left) / rect.width) * canvas.width,
+      y: ((clientY - rect.top) / rect.height) * canvas.height
+    };
+  };
+
+  const handleMove = p => {
+    const rawDx = p.x - ANCHOR_X;
+    const rawDy = Math.max(0, p.y - ANCHOR_Y);
+    const dist = Math.hypot(rawDx, rawDy);
+
+    let tx = ANCHOR_X;
+    let ty = ANCHOR_Y;
+    if (dist > 0) {
+      const clampedDist = Math.min(dist, MAX_DRAG);
+      tx = ANCHOR_X + (rawDx / dist) * clampedDist;
+      ty = ANCHOR_Y + (rawDy / dist) * clampedDist;
+    }
+
+    const minX = 42 + 20;
+    const maxX = canvas.width - 42 - 20;
+    const minY = ANCHOR_Y;
+    const maxY = canvas.height - 42 - 12;
+
+    dragPos = {
+      x: Math.max(minX, Math.min(maxX, tx)),
+      y: Math.max(minY, Math.min(maxY, ty))
+    };
+  };
+
+  const onStart = e => {
+    if (!isPlaying || !ball || ball.state !== 'IDLE') return;
+    const p = getPos(e);
+    if (Math.hypot(p.x - ANCHOR_X, p.y - ANCHOR_Y) < 150 || (p.y > (ANCHOR_Y - 100) && Math.abs(p.x - ANCHOR_X) < 160)) {
+      isDragging = true;
+      handleMove(p);
+    }
+  };
+
+  const onMove = e => {
+    if (!isDragging || !ball) return;
+    handleMove(getPos(e));
+  };
+
+  const onEnd = () => {
+    if (!isDragging || !ball) return;
+    isDragging = false;
+    const dx = ANCHOR_X - dragPos.x;
+    const dy = ANCHOR_Y - dragPos.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 18) {
+      let spd = Math.max(MIN_SPEED, Math.min(MAX_SPEED, dist * LAUNCH_IMPULSE_RATIO));
+      const angle = Math.atan2(dy, dx);
+      ball.vx = Math.cos(angle) * spd;
+      ball.vy = Math.sin(angle) * spd;
+      ball.state = 'FLYING';
+      ball.launchTime = Date.now();
+      AudioSys.playSFX('sfx_shoot');
+    } else {
+      dragPos = { x: ANCHOR_X, y: ANCHOR_Y };
+    }
+  };
+
+  canvas.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onEnd);
+  canvas.addEventListener('touchstart', onStart, { passive: false });
+  window.addEventListener('touchmove', onMove, { passive: false });
+  window.addEventListener('touchend', onEnd);
+}
+
+let lastTime = performance.now();
+function gameLoop(now) {
+  const dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  if (isPlaying) update(dt);
+  render();
+
+  requestAnimationFrame(gameLoop);
+}
+
+function update(dt) {
+  if (ball && ball.state === 'FLYING') {
+    const curSpd = Math.hypot(ball.vx, ball.vy);
+    if (curSpd > MAX_SPEED) {
+      const factor = MAX_SPEED / curSpd;
+      ball.vx *= factor;
+      ball.vy *= factor;
+    }
+    ball.x += ball.vx * dt;
+    ball.y += ball.vy * dt;
+
+    // 墙壁碰撞
+    if (ball.x - ball.r < 20) {
+      ball.x = 20 + ball.r; ball.vx = Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+    } else if (ball.x + ball.r > canvas.width - 20) {
+      ball.x = canvas.width - 20 - ball.r; ball.vx = -Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+    }
+    if (ball.y - ball.r < (isPortrait ? 85 : 75)) {
+      ball.y = (isPortrait ? 85 : 75) + ball.r; ball.vy = Math.abs(ball.vy); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+    } else if (ball.y - ball.r > canvas.height) {
+      const w = ball.word; ball = null; onMiss(w); return;
+    }
+
+    // 方块碰撞
+    for (const b of blocks) {
+      if (b.eliminated) continue;
+
+      if (b.type === 'BUMPER') {
+        const dist = Math.hypot(ball.x - b.x, ball.y - b.y);
+        const br = b.w / 2;
+        if (dist < ball.r + br) {
+          const nx = (ball.x - b.x) / (dist || 1);
+          const ny = (ball.y - b.y) / (dist || 1);
+          const dot = ball.vx * nx + ball.vy * ny;
+          ball.vx = ball.vx - 2 * dot * nx;
+          ball.vy = ball.vy - 2 * dot * ny;
+          const boostSpd = Math.min(MAX_SPEED, Math.max(450, Math.hypot(ball.vx, ball.vy) * 1.05));
+          const norm = Math.hypot(ball.vx, ball.vy) || 1;
+          ball.vx = (ball.vx / norm) * boostSpd;
+          ball.vy = (ball.vy / norm) * boostSpd;
+          ball.bounces++;
+          score += 20;
+          document.getElementById('score-badge').innerText = `得分: ${String(score).padStart(4, '0')}`;
+          AudioSys.playSFX('sfx_bumper');
+          b.shake = 10;
+        }
+      } else if (b.type === 'TARGET' || b.shape === 'CIRCLE') {
+        const dist = Math.hypot(ball.x - b.x, ball.y - b.y);
+        const br = (b.w || 84) / 2;
+        if (dist < ball.r + br) {
+          const nx = (ball.x - b.x) / (dist || 1);
+          const ny = (ball.y - b.y) / (dist || 1);
+          const overlap = (ball.r + br) - dist;
+          ball.x += nx * overlap;
+          ball.y += ny * overlap;
+
+          const dot = ball.vx * nx + ball.vy * ny;
+          ball.vx = ball.vx - 2 * dot * nx;
+          ball.vy = ball.vy - 2 * dot * ny;
+          ball.bounces++;
+
+          if (b.type === 'TARGET') {
+            if (b.word === ball.word) {
+              b.eliminated = true;
+              remainingTargets.delete(b.word);
+              StorageSys.recordHit(b.word, curGrade, curLevelIdx);
+              onHitSuccess(b.word, ball.bounces);
+              ball = null;
+              return;
+            } else {
+              b.shake = 8;
+              StorageSys.recordMiss(b.word);
+              AudioSys.playSFX('sfx_mismatch');
+            }
+          } else {
+            b.shake = 6;
+            AudioSys.playSFX('sfx_bounce');
+          }
+        }
+      }
+    }
+
+    if (Date.now() - ball.launchTime > 14000) {
+      const w = ball.word; ball = null; onMiss(w);
+    }
+  }
+
+  for (const b of blocks) {
+    if (b.shake > 0) b.shake -= dt * 30;
+  }
+}
+
+function onHitSuccess(word, bounces) {
+  missCount = 0;
+  activeWeakHint = false;
+  combo++;
+  const addPts = 10 * combo + (bounces >= 3 ? 30 : 0);
+  score += addPts;
+  document.getElementById('score-badge').innerText = `得分: ${String(score).padStart(4, '0')}`;
+
+  if (combo > 1) {
+    const cb = document.getElementById('combo-badge');
+    cb.innerText = `连击 x${combo}!`;
+    cb.style.display = 'block';
+  }
+
+  AudioSys.playSFX('sfx_match');
+  setTimeout(() => AudioSys.playWord(word), 120);
+  if (bounces >= 3) {
+    setTimeout(() => AudioSys.playVoice('vo_super'), 800);
+  }
+
+  const popup = document.getElementById('big-word-popup');
+  document.getElementById('big-word-pinyin').innerText = getWordPinyin(word);
+  document.getElementById('big-word-char').innerText = word;
+  document.getElementById('big-word-pts').innerText = `+${addPts} 命中!`;
+  popup.classList.add('show');
+
+  setTimeout(() => {
+    popup.classList.remove('show');
+    if (remainingTargets.size === 0) {
+      handleLevelComplete();
+    } else {
+      spawnNextBall();
+    }
+  }, 950);
+}
+
+function onMiss(word) {
+  missCount++;
+  combo = 0;
+  document.getElementById('combo-badge').style.display = 'none';
+  if (missCount >= 2) activeWeakHint = true;
+  setTimeout(spawnNextBall, 400);
+}
+
+function handleLevelComplete() {
+  StorageSys.recordLevelWin(curGrade, curLevelIdx, 3);
+  AudioSys.playSFX('sfx_win');
+  setTimeout(() => AudioSys.playVoice('vo_clear'), 300);
+
+  const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(curGrade);
+  const isGradeComplete = (curLevelIdx + 1 >= totalInGrade);
+
+  let title = `恭喜通过第 ${curGrade} 级 · 第 ${curLevelIdx + 1} 关！`;
+  let desc = `得分: ${score} | 累计识字: ${StorageSys.data.totalHits} 次 (艾宾浩斯复习巩固)`;
+  if (isGradeComplete) {
+    if (curGrade < 5) {
+      title = `🎉 恭喜通关【第 ${curGrade} 级】全部字词！`;
+      desc = `下一关将解锁【第 ${curGrade + 1} 级】新词汇挑战！`;
+    } else {
+      title = `👑 恭喜全部 5 个等级完全通关！`;
+      desc = `已牢固掌握 300 个核心汉字！你是超级识字大宗师！`;
+    }
+  }
+  document.getElementById('win-summary').innerText = title;
+  document.getElementById('win-unlocked-tip').innerText = desc;
+  document.getElementById('win-modal').classList.add('show');
+}
+
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // 背景底色与装饰
+  ctx.fillStyle = '#FFF9E6';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  if (isPortrait) {
+    ctx.beginPath();
+    ctx.arc(110, 110, 45, 0, Math.PI * 2);
+    ctx.arc(150, 100, 58, 0, Math.PI * 2);
+    ctx.arc(190, 110, 38, 0, Math.PI * 2);
+    ctx.arc(530, 130, 45, 0, Math.PI * 2);
+    ctx.arc(570, 120, 58, 0, Math.PI * 2);
+    ctx.arc(610, 130, 38, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    ctx.beginPath();
+    ctx.arc(180, 140, 50, 0, Math.PI * 2);
+    ctx.arc(230, 130, 65, 0, Math.PI * 2);
+    ctx.arc(280, 140, 45, 0, Math.PI * 2);
+    ctx.arc(1040, 180, 50, 0, Math.PI * 2);
+    ctx.arc(1090, 170, 65, 0, Math.PI * 2);
+    ctx.arc(1140, 180, 45, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 底部发射基线
+  const baselineY = isPortrait ? 1040 : 520;
+  ctx.strokeStyle = '#E0D6C3';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([12, 12]);
+  ctx.beginPath();
+  ctx.moveTo(30, baselineY);
+  ctx.lineTo(canvas.width - 30, baselineY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // 弹弓底托
+  ctx.fillStyle = '#D7CCC8';
+  ctx.beginPath();
+  ctx.arc(ANCHOR_X, ANCHOR_Y, 28, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#8D6E63';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+
+  // 方块
+  for (const b of blocks) {
+    if (b.eliminated) continue;
+
+    ctx.save();
+    const offX = (b.shake > 0 ? (Math.random() - 0.5) * b.shake : 0);
+    const offY = (b.shake > 0 ? (Math.random() - 0.5) * b.shake : 0);
+    ctx.translate(b.x + offX, b.y + offY);
+    ctx.rotate(b.rotation);
+
+    if (b.type === 'TARGET') {
+      const r = (b.w || 84) / 2;
+
+      // 弱提示光环
+      if (activeWeakHint && ball && b.word === ball.word) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.arc(0, 0, r + 6, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // 1. 悬浮软阴影与透光微焦散
+      ctx.fillStyle = 'rgba(26, 35, 126, 0.18)';
+      ctx.beginPath();
+      ctx.ellipse(0, r * 0.82, r * 0.95, r * 0.3, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. 晶莹剔透天青水晶玻璃球体
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.clip();
+
+      const bodyGrad = ctx.createRadialGradient(
+        r * 0.22, r * 0.25, r * 0.05,
+        -r * 0.1, -r * 0.1, r * 1.05
+      );
+      bodyGrad.addColorStop(0.0, '#E0F7FA');
+      bodyGrad.addColorStop(0.2, '#80DEEA');
+      bodyGrad.addColorStop(0.5, '#26C6DA');
+      bodyGrad.addColorStop(0.8, '#00ACC1');
+      bodyGrad.addColorStop(0.95, '#00838F');
+      bodyGrad.addColorStop(1.0, '#006064');
+      ctx.fillStyle = bodyGrad;
+      ctx.fillRect(-r, -r, r * 2, r * 2);
+
+      const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.68);
+      coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.45)');
+      coreGrad.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+      coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = coreGrad;
+      ctx.fillRect(-r, -r, r * 2, r * 2);
+
+      // 3. 悬浮汉字
+      ctx.font = '900 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = 'rgba(0, 77, 64, 0.7)';
+      ctx.fillText(b.word, 0.5, 2.5);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#00838F';
+      ctx.lineWidth = 2;
+      ctx.strokeText(b.word, 0, 0);
+      ctx.fillText(b.word, 0, 0);
+
+      // 4. 表层极光滑高曲率反光
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.75, -Math.PI * 0.88, -Math.PI * 0.26);
+      ctx.lineWidth = r * 0.13;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.stroke();
+      ctx.restore();
+
+      const glintX = -r * 0.42;
+      const glintY = -r * 0.42;
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(glintX, glintY, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore(); // 结束 clip
+
+      // 5. 菲涅尔边缘光滑轮廓环
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, r - 0.75, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+      ctx.restore();
+
+      // 艾宾浩斯复习标识小角标
+      if (b.isReview) {
+        ctx.save();
+        const badgeX = r * 0.62;
+        const badgeY = -r * 0.62;
+        const bR = 12;
+        ctx.beginPath();
+        ctx.arc(badgeX, badgeY, bR, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFA000';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.stroke();
+
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#FFFFFF';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('复', badgeX, badgeY + 1);
+        ctx.restore();
+      }
+    } else if (b.type === 'BUMPER') {
+      const grad = ctx.createRadialGradient(0, 0, 10, 0, 0, b.w/2);
+      grad.addColorStop(0, '#FF8A80');
+      grad.addColorStop(1, '#D50000');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, b.w/2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#FFF';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      ctx.fillStyle = '#FFF';
+      ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('⚡', 0, 0);
+    }
+    ctx.restore();
+  }
+
+  // 瞄准虚线 (加长至 880px 并支持侧墙镜面反弹预测)
+  if (isDragging) {
+    const dx = ANCHOR_X - dragPos.x;
+    const dy = ANCHOR_Y - dragPos.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist > 18) {
+      let nx = dx / dist;
+      let ny = dy / dist;
+      let curX = ANCHOR_X;
+      let curY = ANCHOR_Y;
+      const minX = 20 + 42;
+      const maxX = canvas.width - 20 - 42;
+      const maxDistance = Math.min(880, 220 + dist * 7.5);
+      const step = 28;
+      const totalSteps = Math.floor(maxDistance / step);
+
+      ctx.fillStyle = '#FFA000';
+      for (let s = 1; s <= totalSteps; s++) {
+        curX += nx * step;
+        curY += ny * step;
+        if (curX < minX) {
+          curX = minX + (minX - curX);
+          nx = Math.abs(nx);
+        } else if (curX > maxX) {
+          curX = maxX - (curX - maxX);
+          nx = -Math.abs(nx);
+        }
+        if (curY < 80) break;
+        const progress = s / totalSteps;
+        ctx.beginPath();
+        ctx.arc(curX, curY, Math.max(3.2, 6.5 - progress * 2.8), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+
+  // 玩家弹射小球
+  if (ball) {
+    const bx = (ball.state === 'IDLE' ? dragPos.x : ball.x);
+    const by = (ball.state === 'IDLE' ? dragPos.y : ball.y);
+    const br = ball.r;
+
+    ctx.save();
+    ctx.translate(bx, by);
+
+    // 阴影
+    ctx.fillStyle = 'rgba(26, 35, 126, 0.22)';
+    ctx.beginPath();
+    ctx.ellipse(0, br * 0.82, br * 0.95, br * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 玻璃球体
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, br, 0, Math.PI * 2);
+    ctx.clip();
+
+    const ballGrad = ctx.createRadialGradient(
+      br * 0.2, br * 0.2, br * 0.05,
+      -br * 0.1, -br * 0.1, br * 1.05
+    );
+    ballGrad.addColorStop(0.0, '#FFF9C4');
+    ballGrad.addColorStop(0.2, '#FFE082');
+    ballGrad.addColorStop(0.5, '#FFB300');
+    ballGrad.addColorStop(0.85, '#FF8F00');
+    ballGrad.addColorStop(1.0, '#E65100');
+    ctx.fillStyle = ballGrad;
+    ctx.fillRect(-br, -br, br * 2, br * 2);
+
+    ctx.font = '900 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#FFFFFF';
+    ctx.strokeStyle = '#BF360C';
+    ctx.lineWidth = 2;
+    ctx.strokeText(ball.word, 0, 0);
+    ctx.fillText(ball.word, 0, 0);
+
+    // 光泽弧
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, br * 0.75, -Math.PI * 0.88, -Math.PI * 0.26);
+    ctx.lineWidth = br * 0.13;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.88)';
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore(); // 结束 clip
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 0, br - 0.75, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.restore();
+  }
+}
+
+window.addEventListener('DOMContentLoaded', init);
+
+</script>
+</body>
+</html>

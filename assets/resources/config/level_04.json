@@ -1,0 +1,69 @@
+{
+  "levelId": 4,
+  "title": "林间弹力木",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "木",
+    "石"
+  ],
+  "distractorWords": [
+    "土",
+    "大"
+  ],
+  "ballSequence": [
+    "木",
+    "石",
+    "木"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "ARROW"
+  },
+  "targetScore": 20,
+  "blocks": [
+    {
+      "id": "obs1",
+      "type": "OBSTACLE",
+      "x": 0,
+      "y": 50,
+      "width": 110,
+      "height": 60,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "木",
+      "x": -280,
+      "y": 200,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "石",
+      "x": 280,
+      "y": 200,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "d1",
+      "type": "TARGET",
+      "word": "土",
+      "x": 0,
+      "y": 220,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

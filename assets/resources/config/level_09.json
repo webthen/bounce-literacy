@@ -1,0 +1,117 @@
+{
+  "levelId": 9,
+  "title": "五行自然界",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "木",
+    "火",
+    "土",
+    "水",
+    "石"
+  ],
+  "distractorWords": [
+    "天",
+    "大"
+  ],
+  "ballSequence": [
+    "木",
+    "火",
+    "土",
+    "水",
+    "石",
+    "土"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "GLOW"
+  },
+  "targetScore": 50,
+  "blocks": [
+    {
+      "id": "bmp1",
+      "type": "BUMPER",
+      "x": -180,
+      "y": -30,
+      "width": 55,
+      "height": 55,
+      "shape": "CIRCLE",
+      "rotation": 0
+    },
+    {
+      "id": "bmp2",
+      "type": "BUMPER",
+      "x": 180,
+      "y": -30,
+      "width": 55,
+      "height": 55,
+      "shape": "CIRCLE",
+      "rotation": 0
+    },
+    {
+      "id": "bmp3",
+      "type": "BUMPER",
+      "x": 0,
+      "y": 50,
+      "width": 55,
+      "height": 55,
+      "shape": "CIRCLE",
+      "rotation": 0
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "木",
+      "x": -360,
+      "y": 100,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "火",
+      "x": -180,
+      "y": 210,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t3",
+      "type": "TARGET",
+      "word": "土",
+      "x": 0,
+      "y": 230,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t4",
+      "type": "TARGET",
+      "word": "水",
+      "x": 180,
+      "y": 210,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t5",
+      "type": "TARGET",
+      "word": "石",
+      "x": 360,
+      "y": 100,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

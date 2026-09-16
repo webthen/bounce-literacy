@@ -1,0 +1,114 @@
+{
+  "levelId": 8,
+  "title": "奔腾的骏马",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "马",
+    "鸟",
+    "人",
+    "山"
+  ],
+  "distractorWords": [
+    "牛",
+    "羊"
+  ],
+  "ballSequence": [
+    "马",
+    "鸟",
+    "人",
+    "山",
+    "马"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "GLOW"
+  },
+  "targetScore": 40,
+  "blocks": [
+    {
+      "id": "obs1",
+      "type": "OBSTACLE",
+      "x": -150,
+      "y": 0,
+      "width": 60,
+      "height": 60,
+      "shape": "BOX",
+      "rotation": 45
+    },
+    {
+      "id": "obs2",
+      "type": "OBSTACLE",
+      "x": 150,
+      "y": 0,
+      "width": 60,
+      "height": 60,
+      "shape": "BOX",
+      "rotation": 45
+    },
+    {
+      "id": "obs3",
+      "type": "OBSTACLE",
+      "x": 0,
+      "y": 80,
+      "width": 60,
+      "height": 60,
+      "shape": "BOX",
+      "rotation": 45
+    },
+    {
+      "id": "obs4",
+      "type": "OBSTACLE",
+      "x": 0,
+      "y": -80,
+      "width": 60,
+      "height": 60,
+      "shape": "BOX",
+      "rotation": 45
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "马",
+      "x": -360,
+      "y": 140,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "鸟",
+      "x": 360,
+      "y": 140,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t3",
+      "type": "TARGET",
+      "word": "人",
+      "x": -180,
+      "y": 220,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t4",
+      "type": "TARGET",
+      "word": "山",
+      "x": 180,
+      "y": 220,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

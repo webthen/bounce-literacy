@@ -1,0 +1,58 @@
+{
+  "levelId": 1,
+  "title": "山水初相逢",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "山",
+    "水"
+  ],
+  "distractorWords": [
+    "日"
+  ],
+  "ballSequence": [
+    "山",
+    "水",
+    "山"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 2,
+    "hintType": "GLOW"
+  },
+  "targetScore": 20,
+  "blocks": [
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "山",
+      "x": -160,
+      "y": 160,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "水",
+      "x": 160,
+      "y": 160,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "d1",
+      "type": "TARGET",
+      "word": "日",
+      "x": 0,
+      "y": 240,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

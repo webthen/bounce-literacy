@@ -1,0 +1,264 @@
+[
+  {
+    "id": 1,
+    "char": "日",
+    "pinyin": "rì",
+    "audioFile": "ri.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "目",
+      "口",
+      "白"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 2,
+    "char": "月",
+    "pinyin": "yuè",
+    "audioFile": "yue.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "日",
+      "目"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 3,
+    "char": "山",
+    "pinyin": "shān",
+    "audioFile": "shan.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "出",
+      "水"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 4,
+    "char": "水",
+    "pinyin": "shuǐ",
+    "audioFile": "shui.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "山",
+      "木",
+      "小"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 5,
+    "char": "大",
+    "pinyin": "dà",
+    "audioFile": "da.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "太",
+      "天",
+      "人"
+    ],
+    "category": "OBJECT"
+  },
+  {
+    "id": 6,
+    "char": "小",
+    "pinyin": "xiǎo",
+    "audioFile": "xiao.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "少",
+      "水"
+    ],
+    "category": "OBJECT"
+  },
+  {
+    "id": 7,
+    "char": "人",
+    "pinyin": "rén",
+    "audioFile": "ren.wav",
+    "strokeCount": 2,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "入",
+      "八",
+      "大"
+    ],
+    "category": "HUMAN"
+  },
+  {
+    "id": 8,
+    "char": "天",
+    "pinyin": "tiān",
+    "audioFile": "tian.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "大",
+      "夫"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 9,
+    "char": "木",
+    "pinyin": "mù",
+    "audioFile": "mu.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "本",
+      "禾",
+      "术"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 10,
+    "char": "火",
+    "pinyin": "huǒ",
+    "audioFile": "huo.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "人",
+      "大"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 11,
+    "char": "土",
+    "pinyin": "tǔ",
+    "audioFile": "tu.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "士",
+      "工"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 12,
+    "char": "石",
+    "pinyin": "shí",
+    "audioFile": "shi.wav",
+    "strokeCount": 5,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "右",
+      "口"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 13,
+    "char": "田",
+    "pinyin": "tián",
+    "audioFile": "tian2.wav",
+    "strokeCount": 5,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "日",
+      "口"
+    ],
+    "category": "NATURE"
+  },
+  {
+    "id": 14,
+    "char": "口",
+    "pinyin": "kǒu",
+    "audioFile": "kou.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "日",
+      "田"
+    ],
+    "category": "HUMAN"
+  },
+  {
+    "id": 15,
+    "char": "手",
+    "pinyin": "shǒu",
+    "audioFile": "shou.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "毛"
+    ],
+    "category": "HUMAN"
+  },
+  {
+    "id": 16,
+    "char": "目",
+    "pinyin": "mù",
+    "audioFile": "mu4.wav",
+    "strokeCount": 5,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "日",
+      "月"
+    ],
+    "category": "HUMAN"
+  },
+  {
+    "id": 17,
+    "char": "马",
+    "pinyin": "mǎ",
+    "audioFile": "ma.wav",
+    "strokeCount": 3,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "鸟"
+    ],
+    "category": "ANIMAL"
+  },
+  {
+    "id": 18,
+    "char": "牛",
+    "pinyin": "niú",
+    "audioFile": "niu.wav",
+    "strokeCount": 4,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "午",
+      "半"
+    ],
+    "category": "ANIMAL"
+  },
+  {
+    "id": 19,
+    "char": "羊",
+    "pinyin": "yáng",
+    "audioFile": "yang.wav",
+    "strokeCount": 6,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "半"
+    ],
+    "category": "ANIMAL"
+  },
+  {
+    "id": 20,
+    "char": "鸟",
+    "pinyin": "niǎo",
+    "audioFile": "niao.wav",
+    "strokeCount": 5,
+    "book": "小羊上山2",
+    "confusingChars": [
+      "马",
+      "乌"
+    ],
+    "category": "ANIMAL"
+  }
+]

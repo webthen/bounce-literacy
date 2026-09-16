@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 70 70" width="70" height="70">
+  <defs>
+    <radialGradient id="bumperGrad" cx="40%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#FF8A80"/>
+      <stop offset="60%" stop-color="#FF5252"/>
+      <stop offset="100%" stop-color="#D50000"/>
+    </radialGradient>
+  </defs>
+  <circle cx="35" cy="35" r="32" fill="url(#bumperGrad)" stroke="#FFFFFF" stroke-width="4"/>
+  <circle cx="35" cy="35" r="18" fill="#FFD700" stroke="#FFF" stroke-width="2"/>
+  <polygon points="35,23 38,31 46,31 40,36 42,44 35,39 28,44 30,36 24,31 32,31" fill="#FFFFFF"/>
+</svg>

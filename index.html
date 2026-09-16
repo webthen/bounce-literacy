@@ -1,0 +1,687 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="format-detection" content="telephone=no">
+  <title>《弹弹识字》V1</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1A1C23;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    /* 页面内一键横屏/竖屏自由切换 */
+    #game-wrapper.in-page-rotated {
+      position: fixed !important;
+      top: 50% !important;
+      left: 50% !important;
+      width: 100vh !important;
+      height: 100vw !important;
+      max-width: 177.78vw !important;
+      max-height: 56.25vh !important;
+      transform: translate(-50%, -50%) rotate(90deg) !important;
+      transform-origin: center center !important;
+      z-index: 1000 !important;
+      border-radius: 0 !important;
+      box-shadow: 0 0 50px rgba(0,0,0,0.8) !important;
+    }
+
+    /* 游戏主体容器 (16:9 比例锁定) */
+    #game-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      max-width: 177.78vh;
+      max-height: 56.25vw;
+      aspect-ratio: 16 / 9;
+      background: #FFF9E6;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    @media (min-width: 960px) and (min-height: 540px) {
+      #game-wrapper {
+        border-radius: 16px;
+      }
+    }
+
+    canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block;
+    }
+
+    /* 顶部 HUD 栏 */
+    .hud {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 68px;
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      z-index: 20;
+    }
+    .hud-left, .hud-center, .hud-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      pointer-events: auto;
+    }
+    .badge {
+      background: #FFA000;
+      color: #FFF;
+      font-size: 18px;
+      font-weight: bold;
+      padding: 6px 16px;
+      border-radius: 18px;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.15);
+    }
+    .combo-badge {
+      background: #FF5252;
+      color: #FFF;
+      font-size: 20px;
+      font-weight: 900;
+      padding: 6px 18px;
+      border-radius: 18px;
+      animation: pulse 0.5s infinite alternate;
+      display: none;
+    }
+    @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+    .btn-hud {
+      background: #FFF;
+      border: 2px solid #E0E0E0;
+      font-size: 15px;
+      font-weight: bold;
+      padding: 6px 14px;
+      border-radius: 14px;
+      cursor: pointer;
+      color: #5D4037;
+      transition: transform 0.1s;
+    }
+    .btn-hud:active { transform: scale(0.92); }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #FFF;
+      border: 2px solid #E0E0E0;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      color: #5D4037;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.12);
+      transition: transform 0.1s, background 0.15s;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      padding: 0;
+    }
+    .btn-icon:active {
+      transform: scale(0.92);
+      background: #F5F5F5;
+    }
+
+    /* 命中大字光圈 */
+    #big-word-popup {
+      position: absolute;
+      top: 42%; left: 50%;
+      transform: translate(-50%, -50%) scale(0);
+      background: rgba(255, 255, 255, 0.96);
+      border: 8px solid #FFA000;
+      border-radius: 36px;
+      padding: 24px 60px;
+      box-shadow: 0 15px 45px rgba(255, 160, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+      z-index: 100;
+    }
+    #big-word-popup.show { transform: translate(-50%, -50%) scale(1); }
+    #big-word-pinyin { font-size: 30px; color: #FFA000; font-weight: bold; }
+    #big-word-char { font-size: 110px; color: #2B2D42; font-weight: 900; line-height: 1.1; }
+    #big-word-pts { font-size: 24px; color: #4CAF50; font-weight: bold; margin-top: 4px; }
+
+    /* 弹窗通用样式 */
+    .modal-mask {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.68);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s;
+    }
+    .modal-mask.show { opacity: 1; pointer-events: auto; }
+    .card {
+      background: #FFF;
+      width: 520px;
+      max-width: 90%;
+      border-radius: 28px;
+      padding: 30px;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.4);
+      animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+    @keyframes popIn { from { transform: scale(0.7); } to { transform: scale(1); } }
+    .btn-main {
+      background: #4CAF50;
+      color: #FFF;
+      font-size: 22px;
+      font-weight: bold;
+      border: none;
+      padding: 12px 36px;
+      border-radius: 24px;
+      cursor: pointer;
+      box-shadow: 0 6px 14px rgba(76, 175, 80, 0.4);
+      margin: 8px;
+    }
+    .btn-sub {
+      background: #FFA000;
+      color: #FFF;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      padding: 10px 26px;
+      border-radius: 20px;
+      cursor: pointer;
+      box-shadow: 0 4px 10px rgba(255, 160, 0, 0.3);
+      margin: 6px;
+    }
+    .btn-close {
+      background: #BDBDBD;
+      color: #FFF;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      padding: 8px 22px;
+      border-radius: 16px;
+      cursor: pointer;
+      margin-top: 12px;
+    }
+
+    /* 首页大厅 */
+    #start-screen {
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at center, #FFF9E6 0%, #FFE082 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 50;
+      transition: opacity 0.3s;
+    }
+    #start-screen.hidden { opacity: 0; pointer-events: none; }
+    .title-logo {
+      font-size: 72px;
+      font-weight: 900;
+      color: #FF6F00;
+      text-shadow: 0 6px 0 #FFE082, 0 10px 20px rgba(255, 111, 0, 0.35);
+      margin-bottom: 6px;
+      animation: bounceTitle 1.8s infinite ease-in-out;
+    }
+    @keyframes bounceTitle {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-12px); }
+    }
+    .title-subtitle {
+      font-size: 22px;
+      color: #6D4C41;
+      font-weight: bold;
+      margin-bottom: 20px;
+    }
+    .grade-pill-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.75);
+      padding: 10px 20px;
+      border-radius: 24px;
+      border: 2px solid #FFE082;
+      box-shadow: 0 4px 14px rgba(255, 179, 0, 0.15);
+    }
+    .grade-label {
+      font-size: 14px;
+      color: #795548;
+      font-weight: bold;
+      margin-bottom: 8px;
+    }
+    .grade-btn-group {
+      display: flex;
+      gap: 8px;
+    }
+    .btn-grade {
+      background: #FFF;
+      border: 2px solid #FFCA28;
+      color: #6D4C41;
+      font-size: 15px;
+      font-weight: bold;
+      padding: 6px 14px;
+      border-radius: 16px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .btn-grade:hover {
+      transform: translateY(-2px);
+    }
+    .btn-grade.active {
+      background: linear-gradient(135deg, #FFA000, #FF6F00);
+      color: #FFF;
+      border-color: #FF6F00;
+      box-shadow: 0 3px 10px rgba(255, 111, 0, 0.4);
+      transform: scale(1.06);
+    }
+    .btn-start-huge {
+      background: linear-gradient(180deg, #66BB6A 0%, #388E3C 100%);
+      color: #FFF;
+      font-size: 36px;
+      font-weight: 900;
+      border: 5px solid #FFF;
+      padding: 16px 76px;
+      border-radius: 46px;
+      box-shadow: 0 10px 25px rgba(56, 142, 60, 0.45);
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .btn-start-huge:active { transform: scale(0.94); }
+    .start-nav-row {
+      display: flex;
+      gap: 18px;
+      margin-top: 28px;
+    }
+
+    /* 小怪兽图鉴 */
+    .monster-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 18px 0;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    .monster-card {
+      background: #F5F5F5;
+      border: 3px solid #E0E0E0;
+      border-radius: 18px;
+      padding: 12px 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .monster-card.locked { opacity: 0.45; filter: grayscale(1); }
+    .monster-icon { font-size: 48px; margin-bottom: 4px; }
+    .monster-name { font-size: 15px; font-weight: bold; color: #333; }
+    .monster-desc { font-size: 11px; color: #777; margin-top: 2px; }
+
+    /* 家长验证门禁 */
+    .gate-opts {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-top: 20px;
+    }
+    .btn-gate-opt {
+      background: #E3F2FD;
+      border: 3px solid #90CAF9;
+      border-radius: 16px;
+      font-size: 24px;
+      font-weight: bold;
+      color: #1976D2;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .btn-gate-opt:active { background: #BBDEFB; }
+
+    /* 学习报表 */
+    .stats-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 14px 0;
+      font-size: 14px;
+      text-align: left;
+      max-height: 220px;
+      display: block;
+      overflow-y: auto;
+    }
+    .stats-table th, .stats-table td {
+      padding: 8px 10px;
+      border-bottom: 1px solid #EEE;
+    }
+    .stats-table th { background: #FFF3E0; color: #E65100; }
+
+    /* 手机竖屏与小屏幕专属响应式优化 (直接竖屏畅玩，零配置) */
+    /* 手机竖屏与小屏幕专属全新 UI 与纵向长屏 (变长 9:16，沉浸式体验) */
+    @media (orientation: portrait), (max-aspect-ratio: 1/1) {
+      #game-wrapper:not(.in-page-rotated) {
+        width: 100vw;
+        height: 100dvh;
+        max-height: 100dvh;
+        max-width: 100vw;
+        aspect-ratio: unset;
+        border-radius: 0;
+        box-shadow: none;
+      }
+
+      /* 顶部 HUD 栏紧凑化 (专为手机打造，清爽无遮挡) */
+      .hud {
+        height: 58px;
+        padding: 0 14px;
+      }
+      .hud-left, .hud-center, .hud-right {
+        gap: 8px;
+      }
+      .badge {
+        font-size: 15px;
+        padding: 6px 14px;
+        border-radius: 16px;
+        white-space: nowrap;
+      }
+      .combo-badge {
+        font-size: 15px;
+        padding: 5px 12px;
+        border-radius: 14px;
+      }
+      .btn-hud {
+        font-size: 14px;
+        padding: 5px 10px;
+        border-radius: 12px;
+      }
+      .btn-icon {
+        width: 40px;
+        height: 40px;
+        font-size: 19px;
+      }
+
+      /* 首页开始界面竖屏专属全新排版 (变长撑满，流式垂直设计) */
+      #start-screen {
+        padding: 24px 20px;
+        justify-content: space-evenly;
+      }
+      .title-logo {
+        font-size: 48px;
+        margin-bottom: 6px;
+        text-shadow: 0 4px #FFE082, 0 8px 16px rgba(255,111,0,0.35);
+      }
+      .title-subtitle {
+        font-size: 16px;
+        margin-bottom: 12px;
+      }
+      .grade-pill-box {
+        padding: 14px 16px;
+        margin-bottom: 16px;
+        border-radius: 20px;
+        width: 100%;
+        max-width: 380px;
+        background: rgba(255, 255, 255, 0.85);
+        box-shadow: 0 6px 18px rgba(255, 179, 0, 0.2);
+      }
+      .grade-label {
+        font-size: 13px;
+        margin-bottom: 10px;
+        color: #6D4C41;
+      }
+      .grade-btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 8px;
+      }
+      .btn-grade {
+        font-size: 13px;
+        padding: 6px 14px;
+        border-radius: 14px;
+      }
+      .btn-start-huge {
+        font-size: 28px;
+        padding: 14px 56px;
+        border-width: 4px;
+        border-radius: 36px;
+        box-shadow: 0 8px 22px rgba(56, 142, 60, 0.45);
+        margin: 10px 0;
+      }
+      .start-nav-row {
+        margin-top: 14px;
+        gap: 12px;
+        width: 100%;
+        justify-content: center;
+      }
+      .btn-sub {
+        font-size: 14px;
+        padding: 8px 18px;
+        margin: 0;
+        border-radius: 18px;
+      }
+
+      /* 击中大字浮窗 (竖屏适中，大字清晰醒目) */
+      #big-word-popup {
+        padding: 18px 44px;
+        border-width: 6px;
+        border-radius: 28px;
+      }
+      #big-word-pinyin { font-size: 26px; }
+      #big-word-char { font-size: 96px; line-height: 1.1; }
+      #big-word-pts { font-size: 20px; margin-top: 4px; }
+
+      /* 对话框与卡片 */
+      .card {
+        padding: 22px 20px;
+        border-radius: 24px;
+        max-width: 90%;
+        max-height: 85vh;
+        overflow-y: auto;
+      }
+      .card h2 {
+        font-size: 24px !important;
+        margin-bottom: 12px !important;
+      }
+      .card p { font-size: 14px !important; }
+      .btn-main {
+        font-size: 18px;
+        padding: 10px 30px;
+        margin: 6px;
+        border-radius: 22px;
+      }
+      .btn-close {
+        font-size: 14px;
+        padding: 6px 18px;
+        margin-top: 10px;
+      }
+      .monster-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        max-height: 220px;
+        margin: 12px 0;
+      }
+      .monster-card {
+        padding: 10px 6px;
+        border-radius: 16px;
+      }
+      .monster-icon {
+        font-size: 38px;
+        margin-bottom: 4px;
+      }
+      .monster-name { font-size: 13px; }
+      .monster-desc { font-size: 11px; display: block; }
+      .gate-opts {
+        gap: 10px;
+        margin-top: 12px;
+      }
+      .btn-gate-opt {
+        padding: 10px;
+        font-size: 20px;
+        border-radius: 14px;
+      }
+      .stats-table {
+        max-height: 200px;
+        font-size: 13px;
+        margin: 10px 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 游戏主容器 -->
+  <div id="game-wrapper">
+    <!-- Pixi.js Canvas 将动态挂载于此 -->
+
+    <!-- 顶部 HUD 栏 (精简优化：左关卡，中得分与连击，右圆球图标按键) -->
+    <div class="hud" id="game-hud" style="display:none;">
+      <div class="hud-left">
+        <div class="badge" id="level-badge">第 1 关</div>
+      </div>
+      <div class="hud-center">
+        <div class="badge" style="background:#29B6F6;" id="score-badge">得分: 0</div>
+        <div class="combo-badge" id="combo-badge">连击 x2!</div>
+      </div>
+      <div class="hud-right">
+        <button class="btn-icon" id="sound-btn" title="声音开关">🔊</button>
+        <button class="btn-icon" id="pause-btn" title="暂停游戏">⏸</button>
+      </div>
+    </div>
+
+    <!-- 首页开始界面 -->
+    <div id="start-screen">
+      <div class="title-logo">★ 弹弹识字 ★</div>
+      <div class="title-subtitle">动动小手弹一弹，快乐认字每一天</div>
+      <div class="grade-pill-box">
+        <div class="grade-label">📚 选择识字等级（艾宾浩斯复习体系 · 共5级300字）</div>
+        <div class="grade-btn-group" id="grade-btn-group">
+          <button class="btn-grade active" data-grade="1">第 1 级</button>
+          <button class="btn-grade" data-grade="2">第 2 级</button>
+          <button class="btn-grade" data-grade="3">第 3 级</button>
+          <button class="btn-grade" data-grade="4">第 4 级</button>
+          <button class="btn-grade" data-grade="5">第 5 级</button>
+        </div>
+        <div class="grade-tip-text" id="grade-tip-text" style="font-size:12px; color:#8D6E63; margin-top:8px; font-weight:bold;">第 1 级 · 启蒙基础 (数词、自然天地、身体动作与亲人)</div>
+      </div>
+      <button class="btn-start-huge" id="btn-start-game">▶ 开 始</button>
+      <div class="start-nav-row">
+        <button class="btn-sub" id="btn-open-monsters">🏆 小怪兽图鉴</button>
+        <button class="btn-sub" style="background:#42A5F5;" id="btn-open-parent">👨‍👩‍👦 家长中心</button>
+        <button class="btn-sub btn-rotate-toggle" style="background:#8E24AA;" id="btn-rotate-start">🔄 横屏模式</button>
+      </div>
+    </div>
+
+    <!-- 命中浮现大字 -->
+    <div id="big-word-popup">
+      <div id="big-word-pinyin">shān</div>
+      <div id="big-word-char">山</div>
+      <div id="big-word-pts">+10 命中!</div>
+    </div>
+
+    <!-- 暂停弹窗 -->
+    <div class="modal-mask" id="pause-modal">
+      <div class="card">
+        <h2 style="font-size:30px; color:#FFA000; margin-bottom:18px;">游戏暂停</h2>
+        <button class="btn-main" id="btn-resume">▶ 继续游戏</button><br>
+        <button class="btn-sub" id="btn-restart-level">🔄 重新开始本关</button><br>
+        <div style="display:flex; gap:10px; justify-content:center; margin:10px 0;">
+          <button class="btn-sub btn-rotate-toggle" id="btn-rotate-hud" style="background:#8E24AA; margin:0;">🔄 切换横屏</button>
+          <button class="btn-sub" id="fullscreen-btn" style="background:#5C6BC0; margin:0;">⛶ 全屏显示</button>
+        </div>
+        <button class="btn-sub" style="background:#8D6E63;" id="btn-quit-to-menu">🏠 返回主菜单</button>
+      </div>
+    </div>
+
+    <!-- 通关结算弹窗 -->
+    <div class="modal-mask" id="win-modal">
+      <div class="card">
+        <h2 style="font-size:34px; color:#FFA000;">★ 太 棒 啦 ！★</h2>
+        <div style="font-size:52px; margin: 14px 0; color:#FFD700;">⭐⭐⭐</div>
+        <p style="font-size:20px; color:#5D4037; font-weight:bold;" id="win-summary">掌握汉字！</p>
+        <p style="font-size:15px; color:#4CAF50; margin:8px 0;" id="win-unlocked-tip"></p>
+        <button class="btn-main" id="modal-next-btn">下一关 ➔</button><br>
+        <button class="btn-close" id="modal-retry-btn">再玩一次</button>
+      </div>
+    </div>
+
+    <!-- 小怪兽图鉴弹窗 -->
+    <div class="modal-mask" id="monster-modal">
+      <div class="card" style="width: 560px;">
+        <h2 style="font-size:28px; color:#FFA000;">🏆 弹弹小怪兽图鉴</h2>
+        <p style="font-size:14px; color:#777; margin-top:4px;" id="monster-counter">已收集: 1 / 5</p>
+        <div class="monster-grid" id="monster-list"></div>
+        <button class="btn-close" id="btn-close-monsters">关 闭</button>
+      </div>
+    </div>
+
+    <!-- 家长门禁验证弹窗 -->
+    <div class="modal-mask" id="gate-modal">
+      <div class="card">
+        <h2 style="font-size:24px; color:#1976D2;">👨‍👩‍👦 家长防误触验证</h2>
+        <p style="font-size:14px; color:#666; margin-top:6px;">请计算以下算式以进入家长模式：</p>
+        <p style="font-size:22px; font-weight:bold; color:#E65100; margin:18px 0;" id="gate-question">三 乘以 四 等于几？</p>
+        <div class="gate-opts" id="gate-options"></div>
+        <button class="btn-close" id="btn-close-gate">返回</button>
+      </div>
+    </div>
+
+    <!-- 家长数据看板弹窗 -->
+    <div class="modal-mask" id="parent-modal">
+      <div class="card" style="width:600px;">
+        <h2 style="font-size:26px; color:#1976D2;">📊 识字学习与艾宾浩斯复习中心</h2>
+        <div id="parent-ebbinghaus-card" style="background:#E8F5E9; border:1px solid #A5D6A7; border-radius:12px; padding:10px 14px; margin:8px 0; text-align:left;">
+          <div style="font-weight:bold; color:#2E7D32; font-size:15px;" id="parent-retention-rate">艾宾浩斯记忆留存率: 100%</div>
+          <div style="font-size:12px; color:#555; margin-top:3px;">
+            系统根据艾宾浩斯遗忘曲线自动在后续关卡混入已学汉字（间隔 N-1, N-2, N-5, N-7），击错汉字权重提升 2.5 倍强化复习！
+          </div>
+        </div>
+        <div style="background:#FFF9C4; border:1px solid #FFE082; border-radius:12px; padding:8px 12px; margin:8px 0; display:flex; align-items:center; justify-content:space-between;">
+          <span style="font-size:14px; color:#F57F17; font-weight:bold;">当前所选等级:</span>
+          <div class="grade-btn-group" id="parent-grade-btn-group">
+            <button class="btn-grade" data-grade="1">第1级</button>
+            <button class="btn-grade" data-grade="2">第2级</button>
+            <button class="btn-grade" data-grade="3">第3级</button>
+            <button class="btn-grade" data-grade="4">第4级</button>
+            <button class="btn-grade" data-grade="5">第5级</button>
+          </div>
+        </div>
+        <p style="font-size:14px; color:#5D4037; margin:6px 0;" id="parent-summary-text">今日识字记录</p>
+        <table class="stats-table">
+          <thead>
+            <tr><th>汉字</th><th>拼音</th><th>曝光</th><th>正确</th><th>易错</th><th>掌握度</th></tr>
+          </thead>
+          <tbody id="stats-tbody"></tbody>
+        </table>
+        <button class="btn-close" id="btn-close-parent">完成退出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Vite 模块化入口 -->
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>

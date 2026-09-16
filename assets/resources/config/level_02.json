@@ -1,0 +1,70 @@
+{
+  "levelId": 2,
+  "title": "日月同辉",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "日",
+    "月"
+  ],
+  "distractorWords": [
+    "山",
+    "水"
+  ],
+  "ballSequence": [
+    "日",
+    "月",
+    "日"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "GLOW"
+  },
+  "targetScore": 20,
+  "blocks": [
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "日",
+      "x": -350,
+      "y": 180,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "月",
+      "x": 350,
+      "y": 180,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "d1",
+      "type": "TARGET",
+      "word": "山",
+      "x": -100,
+      "y": 100,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "d2",
+      "type": "TARGET",
+      "word": "水",
+      "x": 100,
+      "y": 100,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

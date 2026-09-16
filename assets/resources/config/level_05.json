@@ -1,0 +1,81 @@
+{
+  "levelId": 5,
+  "title": "水火交融",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "水",
+    "火",
+    "土"
+  ],
+  "distractorWords": [
+    "木",
+    "日"
+  ],
+  "ballSequence": [
+    "水",
+    "火",
+    "土",
+    "火"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "ARROW"
+  },
+  "targetScore": 30,
+  "blocks": [
+    {
+      "id": "obs1",
+      "type": "OBSTACLE",
+      "x": -250,
+      "y": 40,
+      "width": 120,
+      "height": 30,
+      "shape": "BOX",
+      "rotation": 35
+    },
+    {
+      "id": "obs2",
+      "type": "OBSTACLE",
+      "x": 250,
+      "y": 40,
+      "width": 120,
+      "height": 30,
+      "shape": "BOX",
+      "rotation": -35
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "水",
+      "x": 0,
+      "y": 160,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "火",
+      "x": -380,
+      "y": 180,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t3",
+      "type": "TARGET",
+      "word": "土",
+      "x": 380,
+      "y": 180,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

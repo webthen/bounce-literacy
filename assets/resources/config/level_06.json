@@ -1,0 +1,81 @@
+{
+  "levelId": 6,
+  "title": "田园小牧场",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "牛",
+    "羊",
+    "田"
+  ],
+  "distractorWords": [
+    "马",
+    "口"
+  ],
+  "ballSequence": [
+    "牛",
+    "羊",
+    "田",
+    "羊"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "GLOW"
+  },
+  "targetScore": 30,
+  "blocks": [
+    {
+      "id": "bmp1",
+      "type": "BUMPER",
+      "x": -120,
+      "y": 20,
+      "width": 70,
+      "height": 70,
+      "shape": "CIRCLE",
+      "rotation": 0
+    },
+    {
+      "id": "bmp2",
+      "type": "BUMPER",
+      "x": 120,
+      "y": 20,
+      "width": 70,
+      "height": 70,
+      "shape": "CIRCLE",
+      "rotation": 0
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "牛",
+      "x": -220,
+      "y": 190,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "羊",
+      "x": 220,
+      "y": 190,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t3",
+      "type": "TARGET",
+      "word": "田",
+      "x": 0,
+      "y": 240,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

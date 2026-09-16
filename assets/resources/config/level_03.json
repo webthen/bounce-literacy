@@ -1,0 +1,58 @@
+{
+  "levelId": 3,
+  "title": "天地之大",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "大",
+    "天"
+  ],
+  "distractorWords": [
+    "人"
+  ],
+  "ballSequence": [
+    "大",
+    "天",
+    "大"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "GLOW"
+  },
+  "targetScore": 20,
+  "blocks": [
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "大",
+      "x": -240,
+      "y": 120,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "天",
+      "x": 240,
+      "y": 120,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "d1",
+      "type": "TARGET",
+      "word": "人",
+      "x": 0,
+      "y": 180,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}

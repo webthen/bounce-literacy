@@ -1,0 +1,91 @@
+{
+  "levelId": 7,
+  "title": "眼明手快",
+  "themeBook": "小羊上山2",
+  "targetWords": [
+    "口",
+    "手",
+    "目"
+  ],
+  "distractorWords": [
+    "日",
+    "田"
+  ],
+  "ballSequence": [
+    "口",
+    "手",
+    "目",
+    "手"
+  ],
+  "timeoutSec": 15,
+  "weakHint": {
+    "missCountToTrigger": 3,
+    "hintType": "ARROW"
+  },
+  "targetScore": 30,
+  "blocks": [
+    {
+      "id": "obs1",
+      "type": "OBSTACLE",
+      "x": 0,
+      "y": 100,
+      "width": 240,
+      "height": 40,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "obs2",
+      "type": "OBSTACLE",
+      "x": -320,
+      "y": 0,
+      "width": 50,
+      "height": 50,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "obs3",
+      "type": "OBSTACLE",
+      "x": 320,
+      "y": 0,
+      "width": 50,
+      "height": 50,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t1",
+      "type": "TARGET",
+      "word": "目",
+      "x": 0,
+      "y": 190,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t2",
+      "type": "TARGET",
+      "word": "手",
+      "x": -300,
+      "y": 160,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    },
+    {
+      "id": "t3",
+      "type": "TARGET",
+      "word": "口",
+      "x": 300,
+      "y": 160,
+      "width": 96,
+      "height": 96,
+      "shape": "BOX",
+      "rotation": 0
+    }
+  ]
+}
