@@ -115,8 +115,8 @@ export class EbbinghausEngine {
         word: word,
         x: pos.x,
         y: pos.y,
-        width: 84,
-        height: 84,
+        width: 104,
+        height: 104,
         shape: 'CIRCLE',
         isReview: isReviewWord
       });

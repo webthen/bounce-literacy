@@ -17,17 +17,17 @@ export class TargetBlock extends PIXI.Container {
   private wordText: PIXI.Text;
   private highlightSprite: PIXI.Sprite;
 
-  private static cachedSphereTexture: PIXI.Texture | null = null;
-  private static cachedHighlightTexture: PIXI.Texture | null = null;
+  private static cachedSphereTextures: Map<number, PIXI.Texture> = new Map();
+  private static cachedHighlightTextures: Map<number, PIXI.Texture> = new Map();
 
   public isReview: boolean = false;
 
-  constructor(id: string, word: string, w: number = 84, h: number = 84, isReview: boolean = false) {
+  constructor(id: string, word: string, w: number = 104, h: number = 104, isReview: boolean = false) {
     super();
     this.blockId = id;
     this.word = word;
     this.isReview = isReview;
-    this.r = (w || 84) / 2;
+    this.r = (w && w > 84 ? w : 104) / 2;
     this.w = this.r * 2;
     this.h = this.r * 2;
 
@@ -47,26 +47,26 @@ export class TargetBlock extends PIXI.Container {
     this.sphereSprite.height = this.r * 2 + 16;
     this.addChild(this.sphereSprite);
 
-    // 4. 水晶球内嵌汉字 (字号适中，留出玻璃球壁厚度)
+    // 4. 水晶球内嵌汉字 (字号适中饱满，留出玻璃球壁厚度)
     this.wordShadowText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
-      fontSize: 36,
+      fontSize: 46,
       fontWeight: '900',
       fill: 0x004D40,
       align: 'center'
     });
     this.wordShadowText.anchor.set(0.5);
-    this.wordShadowText.y = 2.5;
+    this.wordShadowText.y = 3;
     this.wordShadowText.alpha = 0.7;
     this.addChild(this.wordShadowText);
 
     this.wordText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
-      fontSize: 36,
+      fontSize: 46,
       fontWeight: '900',
       fill: 0xFFFFFF,
       stroke: 0x00838F,
-      strokeThickness: 2,
+      strokeThickness: 2.5,
       align: 'center'
     });
     this.wordText.anchor.set(0.5);
@@ -84,16 +84,16 @@ export class TargetBlock extends PIXI.Container {
       const tagGfx = new PIXI.Graphics();
       tagGfx.beginFill(0xFF9800);
       tagGfx.lineStyle(1.5, 0xFFFFFF, 1);
-      tagGfx.drawRoundedRect(this.r * 0.28, -this.r * 0.95, 26, 16, 8);
+      tagGfx.drawRoundedRect(this.r * 0.28, -this.r * 0.95, 28, 18, 9);
       tagGfx.endFill();
       const tagText = new PIXI.Text('复', {
         fontFamily: 'sans-serif',
-        fontSize: 11,
+        fontSize: 12,
         fill: 0xFFFFFF,
         fontWeight: 'bold'
       });
       tagText.anchor.set(0.5);
-      tagText.position.set(this.r * 0.28 + 13, -this.r * 0.95 + 8);
+      tagText.position.set(this.r * 0.28 + 14, -this.r * 0.95 + 9);
       this.addChild(tagGfx);
       this.addChild(tagText);
     }
@@ -136,7 +136,7 @@ export class TargetBlock extends PIXI.Container {
   }
 
   private static getSphereTexture(radius: number): PIXI.Texture {
-    if (TargetBlock.cachedSphereTexture) return TargetBlock.cachedSphereTexture;
+    if (TargetBlock.cachedSphereTextures.has(radius)) return TargetBlock.cachedSphereTextures.get(radius)!;
     const dpr = 2;
     const r = radius * dpr;
     const size = (radius * 2 + 16) * dpr;
@@ -184,12 +184,13 @@ export class TargetBlock extends PIXI.Container {
 
     ctx.restore();
 
-    TargetBlock.cachedSphereTexture = PIXI.Texture.from(canvas);
-    return TargetBlock.cachedSphereTexture;
+    const tex = PIXI.Texture.from(canvas);
+    TargetBlock.cachedSphereTextures.set(radius, tex);
+    return tex;
   }
 
   private static getHighlightTexture(radius: number): PIXI.Texture {
-    if (TargetBlock.cachedHighlightTexture) return TargetBlock.cachedHighlightTexture;
+    if (TargetBlock.cachedHighlightTextures.has(radius)) return TargetBlock.cachedHighlightTextures.get(radius)!;
     const dpr = 2;
     const r = radius * dpr;
     const size = (radius * 2 + 16) * dpr;
@@ -235,7 +236,7 @@ export class TargetBlock extends PIXI.Container {
     ctx.stroke();
     ctx.restore();
 
-    // 3. 左上方星芒高光点
+    // 3. 左上方极锐利微小星芒高光点
     const glintX = cx - r * 0.42;
     const glintY = cy - r * 0.42;
     const flareGrad = ctx.createRadialGradient(glintX, glintY, 0, glintX, glintY, r * 0.18);
@@ -249,10 +250,10 @@ export class TargetBlock extends PIXI.Container {
 
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(glintX, glintY, 2.2 * dpr, 0, Math.PI * 2);
+    ctx.arc(glintX, glintY, 2.5 * dpr, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. 右下方环境反光弧
+    // 4. 右下方反向微弱漫反射环境反光
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r - 2.2 * dpr, 0.22 * Math.PI, 0.62 * Math.PI);
@@ -262,7 +263,7 @@ export class TargetBlock extends PIXI.Container {
     ctx.stroke();
     ctx.restore();
 
-    ctx.restore();
+    ctx.restore(); // 释放剪裁
 
     // 5. 玻璃外壁菲涅尔光滑轮廓环
     ctx.save();
@@ -278,7 +279,8 @@ export class TargetBlock extends PIXI.Container {
     ctx.stroke();
     ctx.restore();
 
-    TargetBlock.cachedHighlightTexture = PIXI.Texture.from(canvas);
-    return TargetBlock.cachedHighlightTexture;
+    const hTex = PIXI.Texture.from(canvas);
+    TargetBlock.cachedHighlightTextures.set(radius, hTex);
+    return hTex;
   }
 }

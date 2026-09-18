@@ -35,12 +35,12 @@ export class Slingshot extends PIXI.Container {
     // 弹弓发射底座：带木纹底托与圆环
     this.pedestalGfx.lineStyle(4, 0x8D6E63, 1);
     this.pedestalGfx.beginFill(0xD7CCC8);
-    this.pedestalGfx.drawCircle(this.anchorX, this.anchorY, 34);
+    this.pedestalGfx.drawCircle(this.anchorX, this.anchorY, 36);
     this.pedestalGfx.endFill();
 
     this.pedestalGfx.lineStyle(0);
     this.pedestalGfx.beginFill(0xBCAAA4);
-    this.pedestalGfx.drawCircle(this.anchorX, this.anchorY, 20);
+    this.pedestalGfx.drawCircle(this.anchorX, this.anchorY, 22);
     this.pedestalGfx.endFill();
   }
 
@@ -64,8 +64,8 @@ export class Slingshot extends PIXI.Container {
 
       let curX = this.anchorX;
       let curY = this.anchorY;
-      const minX = 20 + 48; // 侧墙 20px + 小球半径 48px
-      const maxX = viewWidth - 20 - 48;
+      const minX = 20 + 52; // 侧墙 20px + 小球半径 52px
+      const maxX = viewWidth - 20 - 52;
 
       for (let s = 1; s <= totalSteps; s++) {
         curX += nx * step;

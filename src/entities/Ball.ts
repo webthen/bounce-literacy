@@ -2,7 +2,7 @@ import * as PIXI from 'pixi.js';
 
 export class Ball extends PIXI.Container {
   public word: string = '';
-  public r: number = 48;
+  public r: number = 52;
   public vx: number = 0;
   public vy: number = 0;
   public state: 'IDLE' | 'FLYING' | 'DEAD' = 'IDLE';
@@ -36,10 +36,10 @@ export class Ball extends PIXI.Container {
     this.sphereSprite.height = this.r * 2 + 16;
     this.addChild(this.sphereSprite);
 
-    // 4. 水晶内嵌汉字 (悬浮在水晶球内部，字号适中醒目)
+    // 4. 水晶内嵌汉字 (悬浮在水晶球内部，大字号极其醒目)
     this.wordShadowText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-      fontSize: 44,
+      fontSize: 48,
       fontWeight: '900',
       fill: 0x7A1800,
       align: 'center'
@@ -51,7 +51,7 @@ export class Ball extends PIXI.Container {
 
     this.wordText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
-      fontSize: 44,
+      fontSize: 48,
       fontWeight: '900',
       fill: 0xFFFFFF,
       stroke: 0xD84315,

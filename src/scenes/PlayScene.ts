@@ -161,7 +161,7 @@ export class PlayScene extends PIXI.Container {
       const py = centerY - b.y;
 
       if (b.type === 'TARGET') {
-        const tb = new TargetBlock(b.id, b.word || '', b.width, b.height, b.isReview);
+        const tb = new TargetBlock(b.id, b.word || '', (b.width && b.width > 84) ? b.width : 104, (b.height && b.height > 84) ? b.height : 104, b.isReview);
         tb.x = px;
         tb.y = py;
         tb.rotation = (b.rotation || 0) * Math.PI / 180;
@@ -357,24 +357,31 @@ export class PlayScene extends PIXI.Container {
       ball.y += ball.vy * dt;
       ball.updatePhysicsEffects();
 
-      // 边框碰撞
-      if (ball.x - ball.r < 20) {
-        ball.x = 20 + ball.r;
-        ball.vx = Math.abs(ball.vx);
-        ball.bounces++;
-        AudioManager.instance.playSFX('sfx_bounce');
-      } else if (ball.x + ball.r > this.viewWidth - 20) {
-        ball.x = this.viewWidth - 20 - ball.r;
-        ball.vx = -Math.abs(ball.vx);
-        ball.bounces++;
-        AudioManager.instance.playSFX('sfx_bounce');
+      const baselineY = this.isPortrait ? (this.viewHeight - 240) : 520;
+
+      // 边框碰撞：侧壁反弹仅在虚线发射基线以上有效，虚线以下绝不左右来回弹跳
+      if (ball.y <= baselineY) {
+        if (ball.x - ball.r < 20) {
+          ball.x = 20 + ball.r;
+          ball.vx = Math.abs(ball.vx);
+          ball.bounces++;
+          AudioManager.instance.playSFX('sfx_bounce');
+        } else if (ball.x + ball.r > this.viewWidth - 20) {
+          ball.x = this.viewWidth - 20 - ball.r;
+          ball.vx = -Math.abs(ball.vx);
+          ball.bounces++;
+          AudioManager.instance.playSFX('sfx_bounce');
+        }
       }
+
+      // 顶部边界反弹
       if (ball.y - ball.r < (this.isPortrait ? 85 : 75)) {
         ball.y = (this.isPortrait ? 85 : 75) + ball.r;
         ball.vy = Math.abs(ball.vy);
         ball.bounces++;
         AudioManager.instance.playSFX('sfx_bounce');
-      } else if (ball.y - ball.r > this.viewHeight) {
+      } else if (ball.y > baselineY && ball.vy > 0) {
+        // 小球下落越过虚线即视为未击中脱离游戏区，立即利落回收，绝不在虚线下耽搁时间
         const word = ball.word;
         this.recycleBall();
         this.onMiss(word);

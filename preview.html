@@ -1376,7 +1376,7 @@ function spawnNextBall() {
     word,
     x: ANCHOR_X,
     y: ANCHOR_Y,
-    r: 48,
+    r: 52,
     vx: 0,
     vy: 0,
     state: 'IDLE',
@@ -1410,10 +1410,10 @@ function setupInput() {
       ty = ANCHOR_Y + (rawDy / dist) * clampedDist;
     }
 
-    const minX = 48 + 20;
-    const maxX = canvas.width - 48 - 20;
+    const minX = 52 + 20;
+    const maxX = canvas.width - 52 - 20;
     const minY = ANCHOR_Y;
-    const maxY = canvas.height - 48 - 12;
+    const maxY = canvas.height - 52 - 12;
 
     dragPos = {
       x: Math.max(minX, Math.min(maxX, tx)),
@@ -1484,15 +1484,21 @@ function update(dt) {
     ball.x += ball.vx * dt;
     ball.y += ball.vy * dt;
 
-    // 墙壁碰撞
-    if (ball.x - ball.r < 20) {
-      ball.x = 20 + ball.r; ball.vx = Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
-    } else if (ball.x + ball.r > canvas.width - 20) {
-      ball.x = canvas.width - 20 - ball.r; ball.vx = -Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+    const baselineY = isPortrait ? 1040 : 520;
+
+    // 墙壁碰撞：侧壁反弹仅在虚线发射基线以上有效，虚线以下绝不左右来回弹跳
+    if (ball.y <= baselineY) {
+      if (ball.x - ball.r < 20) {
+        ball.x = 20 + ball.r; ball.vx = Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+      } else if (ball.x + ball.r > canvas.width - 20) {
+        ball.x = canvas.width - 20 - ball.r; ball.vx = -Math.abs(ball.vx); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+      }
     }
+
     if (ball.y - ball.r < (isPortrait ? 85 : 75)) {
       ball.y = (isPortrait ? 85 : 75) + ball.r; ball.vy = Math.abs(ball.vy); ball.bounces++; AudioSys.playSFX('sfx_bounce');
-    } else if (ball.y - ball.r > canvas.height) {
+    } else if (ball.y > baselineY && ball.vy > 0) {
+      // 下落越过虚线即视为未击中脱离游戏区，立即利落回收，绝不在虚线下耽搁时间
       const w = ball.word; ball = null; onMiss(w); return;
     }
 
@@ -1521,7 +1527,7 @@ function update(dt) {
         }
       } else if (b.type === 'TARGET' || b.shape === 'CIRCLE') {
         const dist = Math.hypot(ball.x - b.x, ball.y - b.y);
-        const br = (b.w || 84) / 2;
+        const br = (b.w && b.w > 84 ? b.w : 104) / 2;
         if (dist < ball.r + br) {
           const nx = (ball.x - b.x) / (dist || 1);
           const ny = (ball.y - b.y) / (dist || 1);
@@ -1680,7 +1686,7 @@ function render() {
   // 弹弓底托
   ctx.fillStyle = '#D7CCC8';
   ctx.beginPath();
-  ctx.arc(ANCHOR_X, ANCHOR_Y, 34, 0, Math.PI * 2);
+  ctx.arc(ANCHOR_X, ANCHOR_Y, 36, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#8D6E63';
   ctx.lineWidth = 4;
@@ -1697,7 +1703,7 @@ function render() {
     ctx.rotate(b.rotation);
 
     if (b.type === 'TARGET') {
-      const r = (b.w || 84) / 2;
+      const r = (b.w && b.w > 84 ? b.w : 104) / 2;
 
       // 弱提示光环
       if (activeWeakHint && ball && b.word === ball.word) {
@@ -1741,15 +1747,15 @@ function render() {
       ctx.fillRect(-r, -r, r * 2, r * 2);
 
       // 3. 悬浮汉字
-      ctx.font = '900 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+      ctx.font = '900 46px "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillStyle = 'rgba(0, 77, 64, 0.7)';
-      ctx.fillText(b.word, 0.5, 2.5);
+      ctx.fillText(b.word, 0.5, 3);
 
       ctx.fillStyle = '#FFFFFF';
       ctx.strokeStyle = '#00838F';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 2.5;
       ctx.strokeText(b.word, 0, 0);
       ctx.fillText(b.word, 0, 0);
 
@@ -1832,8 +1838,8 @@ function render() {
       let ny = dy / dist;
       let curX = ANCHOR_X;
       let curY = ANCHOR_Y;
-      const minX = 20 + 48;
-      const maxX = canvas.width - 20 - 48;
+      const minX = 20 + 52;
+      const maxX = canvas.width - 20 - 52;
       const maxDistance = Math.min(880, 220 + dist * 7.5);
       const step = 28;
       const totalSteps = Math.floor(maxDistance / step);
@@ -1891,7 +1897,7 @@ function render() {
     ctx.fillStyle = ballGrad;
     ctx.fillRect(-br, -br, br * 2, br * 2);
 
-    ctx.font = '900 44px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.font = '900 48px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#FFFFFF';
