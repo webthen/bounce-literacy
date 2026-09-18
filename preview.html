@@ -1323,7 +1323,8 @@ function loadLevel(idx, grade) {
   document.getElementById('combo-badge').style.display = 'none';
 
   const centerX = isPortrait ? 360 : 640;
-  const centerY = isPortrait ? Math.round(canvas.height * 0.42) : 360;
+  // 往下平移珠子整体阵列 (centerY 从 360 移至 415，竖屏从 0.42 移至 0.48)，确保顶部留出安全边距，绝不被“第几关”“得分”HUD遮盖
+  const centerY = isPortrait ? Math.round(canvas.height * 0.48) : 415;
 
   blocks = curConfig.blocks.map(b => ({
     id: b.id,
@@ -1331,8 +1332,8 @@ function loadLevel(idx, grade) {
     word: b.word,
     x: centerX + b.x,
     y: centerY - b.y,
-    w: b.width || 84,
-    h: b.height || 84,
+    w: (b.width && b.width > 84 ? b.width : 104),
+    h: (b.height && b.height > 84 ? b.height : 104),
     shape: b.shape || 'CIRCLE',
     rotation: (b.rotation || 0) * Math.PI / 180,
     eliminated: false,
@@ -1495,8 +1496,9 @@ function update(dt) {
       }
     }
 
-    if (ball.y - ball.r < (isPortrait ? 85 : 75)) {
-      ball.y = (isPortrait ? 85 : 75) + ball.r; ball.vy = Math.abs(ball.vy); ball.bounces++; AudioSys.playSFX('sfx_bounce');
+    const topBounceY = isPortrait ? 88 : 80;
+    if (ball.y - ball.r < topBounceY) {
+      ball.y = topBounceY + ball.r; ball.vy = Math.abs(ball.vy); ball.bounces++; AudioSys.playSFX('sfx_bounce');
     } else if (ball.y > baselineY && ball.vy > 0) {
       // 下落越过虚线即视为未击中脱离游戏区，立即利落回收，绝不在虚线下耽搁时间
       const w = ball.word; ball = null; onMiss(w); return;

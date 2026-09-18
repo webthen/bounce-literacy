@@ -154,7 +154,8 @@ export class PlayScene extends PIXI.Container {
     }
 
     const centerX = this.viewWidth / 2;
-    const centerY = this.isPortrait ? Math.round(this.viewHeight * 0.42) : 360;
+    // 往下平移珠子整体阵列 (centerY 从 360 移至 415，竖屏从 0.42 移至 0.48)，确保顶部留出充足安全边距，绝不被“第几关”“得分”HUD栏遮盖
+    const centerY = this.isPortrait ? Math.round(this.viewHeight * 0.48) : 415;
 
     for (const b of this.curConfig.blocks) {
       const px = centerX + b.x;
@@ -374,9 +375,10 @@ export class PlayScene extends PIXI.Container {
         }
       }
 
-      // 顶部边界反弹
-      if (ball.y - ball.r < (this.isPortrait ? 85 : 75)) {
-        ball.y = (this.isPortrait ? 85 : 75) + ball.r;
+      // 顶部边界反弹 (在 HUD 下方安全反弹)
+      const topBounceY = this.isPortrait ? 88 : 80;
+      if (ball.y - ball.r < topBounceY) {
+        ball.y = topBounceY + ball.r;
         ball.vy = Math.abs(ball.vy);
         ball.bounces++;
         AudioManager.instance.playSFX('sfx_bounce');
