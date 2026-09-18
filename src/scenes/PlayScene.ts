@@ -189,14 +189,34 @@ export class PlayScene extends PIXI.Container {
   }
 
   private spawnNextBall() {
-    let word = this.ballQueue.shift();
-    if (!word) {
-      if (this.remainingTargets.size > 0) {
-        const arr = Array.from(this.remainingTargets);
-        word = arr[Math.floor(Math.random() * arr.length)];
+    // 1. 获取场上当前实际存活的目标汉字列表 (绝对权威数据源)
+    const activeWords = Array.from(new Set(this.targetBlocks.filter(b => !b.eliminated).map(b => b.word)));
+    if (activeWords.length === 0) {
+      return;
+    }
+
+    // 2. 实时同步 remainingTargets，保证集合绝对准确
+    this.remainingTargets = new Set(activeWords);
+
+    // 3. 过滤掉队列中所有已消除的死词，杜绝“对不上”
+    this.ballQueue = this.ballQueue.filter(w => this.remainingTargets.has(w));
+
+    // 4. 弹珠打完到最后时的动态补给逻辑：
+    if (this.ballQueue.length === 0) {
+      if (activeWords.length === 1) {
+        // 场上仅剩最后 1 个目标字：恒定供给该字，保证最后绝不卡关且 100% 对齐
+        this.ballQueue = [activeWords[0], activeWords[0]];
       } else {
-        return;
+        // 场上剩余多个目标字：生成打乱序列，每词 2 颗，循环保底
+        const refill = [...activeWords, ...activeWords].sort(() => Math.random() - 0.5);
+        this.ballQueue = refill;
       }
+    }
+
+    let word = this.ballQueue.shift();
+    // 5. 终极安全校验：若取出的 word 不在场上，强行从 activeWords 中选取
+    if (!word || !this.remainingTargets.has(word)) {
+      word = activeWords[Math.floor(Math.random() * activeWords.length)];
     }
 
     if (this.currentBall) {
@@ -428,9 +448,16 @@ export class PlayScene extends PIXI.Container {
 
           if (tb.word === ball.word) {
             tb.eliminated = true;
-            this.remainingTargets.delete(tb.word);
             this.removeChild(tb);
             this.targetBlocks.splice(i, 1);
+
+            // 检查场上是否还有相同汉字的目标块
+            const hasMoreOfSameWord = this.targetBlocks.some(b => !b.eliminated && b.word === tb.word);
+            if (!hasMoreOfSameWord) {
+              this.remainingTargets.delete(tb.word);
+              // 立即过滤发射队列中已经消除的字，杜绝弹珠与场上存活目标对不上
+              this.ballQueue = this.ballQueue.filter(w => this.remainingTargets.has(w));
+            }
 
             StorageManager.instance.recordHit(tb.word, this.currentLevelIdx + 1);
             this.particleSys.burst(tb.x, tb.y, 0xFFD700, 35);

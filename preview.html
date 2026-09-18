@@ -1344,20 +1344,39 @@ function loadLevel(idx, grade) {
 }
 
 function spawnNextBall() {
-  let word = ballQueue.shift();
-  if (!word) {
-    if (remainingTargets.size > 0) {
-      const arr = Array.from(remainingTargets);
-      word = arr[Math.floor(Math.random() * arr.length)];
+  // 1. 获取场上当前实际存活的目标汉字列表 (权威数据源)
+  const activeWords = Array.from(new Set(blocks.filter(b => b.type === 'TARGET' && !b.eliminated).map(b => b.word)));
+  if (activeWords.length === 0) return;
+
+  // 2. 实时同步 remainingTargets
+  remainingTargets = new Set(activeWords);
+
+  // 3. 过滤掉队列中所有已消除的死词，杜绝“对不上”
+  ballQueue = ballQueue.filter(w => remainingTargets.has(w));
+
+  // 4. 弹珠打完到最后时的动态补给逻辑：
+  if (ballQueue.length === 0) {
+    if (activeWords.length === 1) {
+      // 场上仅剩最后 1 个目标字：恒定供给该字，保证最后绝不卡关且 100% 对齐
+      ballQueue = [activeWords[0], activeWords[0]];
     } else {
-      return;
+      // 场上剩余多个目标字：生成打乱序列，每词 2 颗，循环保底
+      const refill = [...activeWords, ...activeWords].sort(() => Math.random() - 0.5);
+      ballQueue = refill;
     }
   }
+
+  let word = ballQueue.shift();
+  // 5. 终极安全校验
+  if (!word || !remainingTargets.has(word)) {
+    word = activeWords[Math.floor(Math.random() * activeWords.length)];
+  }
+
   ball = {
     word,
     x: ANCHOR_X,
     y: ANCHOR_Y,
-    r: 42,
+    r: 48,
     vx: 0,
     vy: 0,
     state: 'IDLE',
@@ -1391,10 +1410,10 @@ function setupInput() {
       ty = ANCHOR_Y + (rawDy / dist) * clampedDist;
     }
 
-    const minX = 42 + 20;
-    const maxX = canvas.width - 42 - 20;
+    const minX = 48 + 20;
+    const maxX = canvas.width - 48 - 20;
     const minY = ANCHOR_Y;
-    const maxY = canvas.height - 42 - 12;
+    const maxY = canvas.height - 48 - 12;
 
     dragPos = {
       x: Math.max(minX, Math.min(maxX, tx)),
@@ -1518,7 +1537,12 @@ function update(dt) {
           if (b.type === 'TARGET') {
             if (b.word === ball.word) {
               b.eliminated = true;
-              remainingTargets.delete(b.word);
+              const hasMore = blocks.some(item => item.type === 'TARGET' && !item.eliminated && item.word === b.word);
+              if (!hasMore) {
+                remainingTargets.delete(b.word);
+                // 立即过滤发射队列中已消除的字，杜绝打完对不上
+                ballQueue = ballQueue.filter(w => remainingTargets.has(w));
+              }
               StorageSys.recordHit(b.word, curGrade, curLevelIdx);
               onHitSuccess(b.word, ball.bounces);
               ball = null;
@@ -1656,7 +1680,7 @@ function render() {
   // 弹弓底托
   ctx.fillStyle = '#D7CCC8';
   ctx.beginPath();
-  ctx.arc(ANCHOR_X, ANCHOR_Y, 28, 0, Math.PI * 2);
+  ctx.arc(ANCHOR_X, ANCHOR_Y, 34, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = '#8D6E63';
   ctx.lineWidth = 4;
@@ -1808,8 +1832,8 @@ function render() {
       let ny = dy / dist;
       let curX = ANCHOR_X;
       let curY = ANCHOR_Y;
-      const minX = 20 + 42;
-      const maxX = canvas.width - 20 - 42;
+      const minX = 20 + 48;
+      const maxX = canvas.width - 20 - 48;
       const maxDistance = Math.min(880, 220 + dist * 7.5);
       const step = 28;
       const totalSteps = Math.floor(maxDistance / step);
@@ -1867,12 +1891,12 @@ function render() {
     ctx.fillStyle = ballGrad;
     ctx.fillRect(-br, -br, br * 2, br * 2);
 
-    ctx.font = '900 36px "PingFang SC", "Microsoft YaHei", sans-serif';
+    ctx.font = '900 44px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#BF360C';
-    ctx.lineWidth = 2;
+    ctx.lineWidth = 2.5;
     ctx.strokeText(ball.word, 0, 0);
     ctx.fillText(ball.word, 0, 0);
 
