@@ -8,7 +8,7 @@ import { ParticleSystem } from '../game/ParticleSystem';
 import { AudioManager } from '../game/AudioManager';
 import { StorageManager } from '../utils/Storage';
 import { EbbinghausEngine, DynamicLevelDef } from '../game/EbbinghausEngine';
-import { VOCAB_LIST, getWordPinyin } from '../data/vocab';
+import { VOCAB_LIST, getWordPinyin, getWordPhrase } from '../data/vocab';
 
 export class PlayScene extends PIXI.Container {
   private app: PIXI.Application;
@@ -33,6 +33,8 @@ export class PlayScene extends PIXI.Container {
   private combo: number = 0;
   private missCount: number = 0;
   private activeWeakHint: boolean = false;
+  private lastWrongVoiceTime: number = 0;
+  private isCelebrationActive: boolean = false;
 
   public isPortrait: boolean = false;
   public viewWidth: number = 1280;
@@ -126,7 +128,7 @@ export class PlayScene extends PIXI.Container {
     }
   }
 
-  public startLevel(idx: number, grade?: number) {
+  public startLevel(idx: number, grade?: number, skipIntro: boolean = false) {
     if (grade !== undefined) {
       this.currentGrade = grade;
     } else {
@@ -185,11 +187,79 @@ export class PlayScene extends PIXI.Container {
     }
 
     this.updateHUD();
-    AudioManager.instance.playVoice('vo_ready');
-    this.spawnNextBall();
+
+    // 关卡生字卡片导读弹窗
+    const introModal = document.getElementById('intro-modal');
+    const introCards = document.getElementById('intro-cards-container');
+    const introTitle = document.getElementById('intro-title');
+    if (!skipIntro && introModal && introCards) {
+      if (introTitle) {
+        introTitle.innerText = `第 ${this.currentGrade} 级 · 第 ${this.currentLevelIdx + 1} 课 汉字朋友`;
+      }
+      introCards.innerHTML = '';
+      this.curConfig.targetWords.forEach(w => {
+        const py = getWordPinyin(w);
+        const ph = getWordPhrase(w);
+        const card = document.createElement('div');
+        card.className = 'intro-word-card';
+        card.innerHTML = `
+          <div class="intro-card-pinyin">${py}</div>
+          <div class="intro-card-char">${w}</div>
+          <div class="intro-card-phrase">${ph}</div>
+          <div class="intro-card-voice">🔊 点我听</div>
+        `;
+        card.onclick = () => AudioManager.instance.playWordWithPhrase(w);
+        introCards.appendChild(card);
+      });
+      introModal.classList.add('show');
+      const startBtn = document.getElementById('btn-start-level-play');
+      if (startBtn) {
+        startBtn.onclick = () => {
+          introModal.classList.remove('show');
+          AudioManager.instance.stopVoice();
+          // 顺承播放：vo_ready 念完后再播报找字引导，彻底解决同时出声
+          AudioManager.instance.playVoice('vo_ready', () => {
+            this.promptNextBall();
+          });
+          this.spawnNextBall(false);
+        };
+      }
+      setTimeout(() => {
+        if (this.curConfig.targetWords.length > 0) {
+          AudioManager.instance.playVoice('vo_intro');
+        }
+      }, 350);
+    } else {
+      AudioManager.instance.stopVoice();
+      AudioManager.instance.playVoice('vo_ready', () => {
+        this.promptNextBall();
+      });
+      this.spawnNextBall(false);
+    }
   }
 
-  private spawnNextBall() {
+  private updateMissionHUD(word: string) {
+    const mWord = document.getElementById('mission-word');
+    const mPinyin = document.getElementById('mission-pinyin');
+    const mPhrase = document.getElementById('mission-phrase');
+    const mPill = document.getElementById('mission-pill');
+    if (mWord) mWord.innerText = word;
+    if (mPinyin) mPinyin.innerText = getWordPinyin(word);
+    if (mPhrase) mPhrase.innerText = getWordPhrase(word);
+    if (mPill) {
+      mPill.onclick = () => {
+        AudioManager.instance.playMissionPrompt(word);
+      };
+    }
+  }
+
+  private promptNextBall() {
+    if (this.currentBall && this.currentBall.state === 'IDLE' && !this.isCelebrationActive) {
+      AudioManager.instance.playMissionPrompt(this.currentBall.word);
+    }
+  }
+
+  private spawnNextBall(shouldPrompt: boolean = true) {
     // 1. 获取场上当前实际存活的目标汉字列表 (绝对权威数据源)
     const activeWords = Array.from(new Set(this.targetBlocks.filter(b => !b.eliminated).map(b => b.word)));
     if (activeWords.length === 0) {
@@ -231,6 +301,16 @@ export class PlayScene extends PIXI.Container {
 
     this.addChild(this.currentBall.getTrailGfx());
     this.addChild(this.currentBall);
+
+    // 同步更新识字任务栏并在允许时进行语音引导
+    this.updateMissionHUD(word);
+    if (shouldPrompt && !this.isCelebrationActive) {
+      setTimeout(() => {
+        if (!this.isCelebrationActive) {
+          AudioManager.instance.playMissionPrompt(word);
+        }
+      }, 150);
+    }
   }
 
   private setupInteractions() {
@@ -247,6 +327,7 @@ export class PlayScene extends PIXI.Container {
       if (dist < 150 || (pos.y > (this.slingshot.anchorY - 100) && Math.abs(pos.x - this.slingshot.anchorX) < 160)) {
         this.slingshot.isDragging = true;
         this.updateBallDrag(pos.x, pos.y);
+        AudioManager.instance.playWord(this.currentBall.word);
       }
     };
 
@@ -476,8 +557,17 @@ export class PlayScene extends PIXI.Container {
             return;
           } else {
             tb.triggerSquish();
+            const pinyin = getWordPinyin(tb.word);
+            tb.showSpeechBubble(`这是“${tb.word}” ${pinyin}`, 1.4);
             StorageManager.instance.recordMiss(tb.word);
             AudioManager.instance.playSFX('sfx_mismatch');
+
+            // 防频繁冲突与防轰炸节流：命中庆祝期间严格禁言；1.4秒内至多播报一次撞错提示
+            const now = Date.now();
+            if (!this.isCelebrationActive && now - this.lastWrongVoiceTime > 1400) {
+              this.lastWrongVoiceTime = now;
+              AudioManager.instance.playWrongWord(tb.word);
+            }
           }
         }
       }
@@ -503,29 +593,40 @@ export class PlayScene extends PIXI.Container {
     this.missCount = 0;
     this.activeWeakHint = false;
     this.combo++;
+    this.isCelebrationActive = true;
 
+    // 一发即中 / 识字神射手判定：反弹 <= 1 次即精准击中对应汉字
+    const isDirectHit = bounces <= 1;
     const isSuperHit = bounces >= 3;
-    const addPts = 10 * this.combo + (isSuperHit ? 30 : 0);
+    const directHitBonus = isDirectHit ? 50 : 0;
+    const addPts = 10 * this.combo + (isSuperHit ? 30 : 0) + directHitBonus;
     this.score += addPts;
     this.updateHUD();
 
     StorageManager.instance.recordHit(word, this.currentGrade, this.currentLevelIdx);
-    AudioManager.instance.playSFX('sfx_match');
-    setTimeout(() => AudioManager.instance.playWord(word), 100);
-    if (isSuperHit) {
-      setTimeout(() => AudioManager.instance.playVoice('vo_super'), 800);
-    }
 
-    this.showBigWordPopup(word, addPts);
+    // 立即停止一切在途语音，播放命中音效
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playSFX('sfx_match');
+
+    // 顺承播放：先标准念读词组（“山！大山！”），念完后再触发赞美语音（“太棒了！”），绝无任何声音打架
+    AudioManager.instance.playWordWithPhrase(word, () => {
+      if (isDirectHit || isSuperHit) {
+        AudioManager.instance.playVoice('vo_super');
+      }
+    });
+
+    this.showBigWordPopup(word, addPts, isDirectHit);
 
     setTimeout(() => {
       this.hideBigWordPopup();
+      this.isCelebrationActive = false;
       if (this.remainingTargets.size === 0) {
         this.handleLevelWin();
       } else {
-        this.spawnNextBall();
+        this.spawnNextBall(true);
       }
-    }, 950);
+    }, 1800);
   }
 
   private onMiss(word: string) {
@@ -540,6 +641,8 @@ export class PlayScene extends PIXI.Container {
   }
 
   private handleLevelWin() {
+    this.isCelebrationActive = true;
+    AudioManager.instance.stopVoice();
     StorageManager.instance.recordLevelWin(this.currentGrade, this.currentLevelIdx, 3);
     AudioManager.instance.playSFX('sfx_win');
     setTimeout(() => AudioManager.instance.playVoice('vo_clear'), 300);
@@ -552,6 +655,27 @@ export class PlayScene extends PIXI.Container {
 
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.currentGrade);
     const isGradeComplete = (this.currentLevelIdx + 1 >= totalInGrade);
+
+    // 渲染本关识字复习成果画廊
+    const gallery = document.getElementById('win-words-gallery');
+    if (gallery) {
+      gallery.innerHTML = '';
+      const wordsToReview = this.curConfig.targetWords;
+      wordsToReview.forEach(w => {
+        const py = getWordPinyin(w);
+        const ph = getWordPhrase(w);
+        const card = document.createElement('div');
+        card.className = 'win-word-card';
+        card.innerHTML = `
+          <div class="win-word-pinyin">${py}</div>
+          <div class="win-word-char">${w}</div>
+          <div class="win-word-phrase">${ph}</div>
+          <div class="win-word-speaker">🔊 读一读</div>
+        `;
+        card.onclick = () => AudioManager.instance.playWordWithPhrase(w);
+        gallery.appendChild(card);
+      });
+    }
 
     const winModal = document.getElementById('win-modal');
     if (winModal) {
@@ -572,13 +696,25 @@ export class PlayScene extends PIXI.Container {
     }
   }
 
-  private showBigWordPopup(word: string, pts: number) {
+  private showBigWordPopup(word: string, pts: number, isDirectHit: boolean = false) {
     const popup = document.getElementById('big-word-popup');
     if (!popup) return;
     const pinyin = getWordPinyin(word);
-    document.getElementById('big-word-pinyin')!.innerText = pinyin;
-    document.getElementById('big-word-char')!.innerText = word;
-    document.getElementById('big-word-pts')!.innerText = `+${pts} 命中!`;
+    const phrase = getWordPhrase(word);
+    const hitTypeEl = document.getElementById('big-word-hit-type');
+    const pinyinEl = document.getElementById('big-word-pinyin');
+    const charEl = document.getElementById('big-word-char');
+    const phraseEl = document.getElementById('big-word-phrase');
+    const ptsEl = document.getElementById('big-word-pts');
+
+    if (hitTypeEl) {
+      hitTypeEl.style.display = isDirectHit ? 'block' : 'none';
+      if (isDirectHit) hitTypeEl.innerText = '🎯 识字神射手 · 一发即中！+50分';
+    }
+    if (pinyinEl) pinyinEl.innerText = pinyin;
+    if (charEl) charEl.innerText = word;
+    if (phraseEl) phraseEl.innerText = phrase && phrase !== word ? phrase : `汉字 · ${word}`;
+    if (ptsEl) ptsEl.innerText = `+${pts} 命中!`;
     popup.classList.add('show');
   }
 
@@ -614,6 +750,8 @@ export class PlayScene extends PIXI.Container {
   }
 
   public nextLevel() {
+    AudioManager.instance.stopVoice();
+    this.isCelebrationActive = false;
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.currentGrade);
     if (this.currentLevelIdx + 1 < totalInGrade) {
       this.startLevel(this.currentLevelIdx + 1, this.currentGrade);
@@ -631,6 +769,8 @@ export class PlayScene extends PIXI.Container {
   }
 
   public retryLevel() {
-    this.startLevel(this.currentLevelIdx, this.currentGrade);
+    AudioManager.instance.stopVoice();
+    this.isCelebrationActive = false;
+    this.startLevel(this.currentLevelIdx, this.currentGrade, true);
   }
 }

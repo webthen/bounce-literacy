@@ -3,7 +3,7 @@ import { PlayScene } from './scenes/PlayScene';
 import { AudioManager } from './game/AudioManager';
 import { StorageManager } from './utils/Storage';
 import { MONSTER_LIST } from './data/monsters';
-import { getWordPinyin } from './data/vocab';
+import { getWordPinyin, getWordPhrase, VOCAB_TIERS } from './data/vocab';
 
 class App {
   private app: PIXI.Application;
@@ -179,6 +179,33 @@ class App {
       monsterModal.classList.remove('show');
     };
 
+    // 我的识字画册
+    const bookModal = document.getElementById('book-modal')!;
+    const btnOpenBook = document.getElementById('btn-open-book');
+    if (btnOpenBook) {
+      btnOpenBook.onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        const curGrade = StorageManager.instance.data.currentGrade || 1;
+        this.renderBook(curGrade);
+        bookModal.classList.add('show');
+      };
+    }
+    const btnCloseBook = document.getElementById('btn-close-book');
+    if (btnCloseBook) {
+      btnCloseBook.onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        bookModal.classList.remove('show');
+      };
+    }
+    const bookGradeBtns = document.querySelectorAll('#book-grade-btn-group .btn-grade');
+    bookGradeBtns.forEach(btn => {
+      (btn as HTMLElement).onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        const g = parseInt(btn.getAttribute('data-grade') || '1');
+        this.renderBook(g);
+      };
+    });
+
     // 家长门禁
     const gateModal = document.getElementById('gate-modal')!;
     const parentModal = document.getElementById('parent-modal')!;
@@ -246,11 +273,14 @@ class App {
 
   private quitToTitle() {
     this.isPlaying = false;
+    AudioManager.instance.stopSpeech();
     if (this.playScene) {
       this.app.stage.removeChild(this.playScene);
       this.playScene.destroy({ children: true });
       this.playScene = null;
     }
+    const introModal = document.getElementById('intro-modal');
+    if (introModal) introModal.classList.remove('show');
     document.getElementById('game-hud')!.style.display = 'none';
     document.getElementById('start-screen')!.classList.remove('hidden');
   }
@@ -277,6 +307,52 @@ class App {
       container.appendChild(card);
     });
     document.getElementById('monster-counter')!.innerText = `已收集: ${unlocked} / ${MONSTER_LIST.length}`;
+  }
+
+  private renderBook(grade: number) {
+    const grid = document.getElementById('book-grid')!;
+    grid.innerHTML = '';
+    const stats = StorageManager.instance.data.stats;
+
+    document.querySelectorAll('#book-grade-btn-group .btn-grade').forEach(btn => {
+      const g = parseInt(btn.getAttribute('data-grade') || '1');
+      btn.classList.toggle('active', g === grade);
+    });
+
+    const tier = VOCAB_TIERS[grade] || VOCAB_TIERS[1];
+    let gradeMastered = 0;
+    let totalMastered = 0;
+
+    Object.keys(stats).forEach(k => {
+      if (stats[k].hits > 0) totalMastered++;
+    });
+
+    tier.words.forEach(ch => {
+      const item = stats[ch];
+      const isMastered = item && item.hits > 0;
+      if (isMastered) gradeMastered++;
+
+      const py = getWordPinyin(ch);
+      const ph = getWordPhrase(ch);
+
+      const card = document.createElement('div');
+      card.className = `book-card ${isMastered ? 'mastered' : 'unmastered'}`;
+      card.innerHTML = `
+        ${isMastered ? `<div class="book-badge">✓</div>` : ''}
+        <div class="book-pinyin">${py}</div>
+        <div class="book-char">${ch}</div>
+        <div class="book-phrase">${ph}</div>
+      `;
+      card.onclick = () => {
+        AudioManager.instance.playWordWithPhrase(ch);
+      };
+      grid.appendChild(card);
+    });
+
+    const counter = document.getElementById('book-counter');
+    if (counter) {
+      counter.innerText = `已掌握: ${totalMastered} / 300 字 · 本级掌握: ${gradeMastered} / ${tier.words.length} (${tier.title})`;
+    }
   }
 
   private openParentGate() {

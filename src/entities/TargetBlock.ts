@@ -1,4 +1,6 @@
 import * as PIXI from 'pixi.js';
+import { getWordPinyin, getWordPhrase } from '../data/vocab';
+import { AudioManager } from '../game/AudioManager';
 
 export class TargetBlock extends PIXI.Container {
   public blockId: string;
@@ -16,6 +18,12 @@ export class TargetBlock extends PIXI.Container {
   private wordShadowText: PIXI.Text;
   private wordText: PIXI.Text;
   private highlightSprite: PIXI.Sprite;
+
+  // 点读与碰撞语音注音气泡
+  private bubbleContainer: PIXI.Container;
+  private bubbleBg: PIXI.Graphics;
+  private bubbleText: PIXI.Text;
+  private bubbleTime: number = 0;
 
   private static cachedSphereTextures: Map<number, PIXI.Texture> = new Map();
   private static cachedHighlightTextures: Map<number, PIXI.Texture> = new Map();
@@ -97,16 +105,38 @@ export class TargetBlock extends PIXI.Container {
       this.addChild(tagGfx);
       this.addChild(tagText);
     }
+
+    // 7. 点读与注音气泡容器
+    this.bubbleContainer = new PIXI.Container();
+    this.bubbleContainer.visible = false;
+    this.bubbleBg = new PIXI.Graphics();
+    this.bubbleText = new PIXI.Text('', {
+      fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
+      fontSize: 16,
+      fontWeight: 'bold',
+      fill: 0x006064,
+      align: 'center'
+    });
+    this.bubbleText.anchor.set(0.5);
+    this.bubbleContainer.addChild(this.bubbleBg);
+    this.bubbleContainer.addChild(this.bubbleText);
+    this.addChild(this.bubbleContainer);
+
+    // 8. 开启触控点读 (Point-and-Read)
+    this.eventMode = 'static';
+    this.cursor = 'pointer';
+    this.on('pointertap', (e: PIXI.FederatedPointerEvent) => {
+      e.stopPropagation();
+      this.triggerPointAndRead();
+    });
   }
 
   private drawShadow() {
     this.shadowGfx.clear();
-    // 柔和清爽接触软阴影 (告别深海黑蓝色 0x1A237E)
     this.shadowGfx.beginFill(0x546E7A, 0.12);
     this.shadowGfx.drawEllipse(0, this.r * 0.82, this.r * 0.95, this.r * 0.3);
     this.shadowGfx.endFill();
 
-    // 冰晶玻璃焦散微光
     this.shadowGfx.beginFill(0xE0F7FA, 0.60);
     this.shadowGfx.drawEllipse(0, this.r * 0.82, this.r * 0.42, this.r * 0.14);
     this.shadowGfx.endFill();
@@ -124,6 +154,49 @@ export class TargetBlock extends PIXI.Container {
     this.shakeTime = 0.25;
   }
 
+  /**
+   * 触发主动点读教学
+   */
+  public triggerPointAndRead() {
+    if (this.eliminated) return;
+    this.triggerSquish();
+    const pinyin = getWordPinyin(this.word);
+    const phrase = getWordPhrase(this.word);
+    const tip = phrase && phrase !== this.word ? `${this.word} ${pinyin} · ${phrase}` : `${this.word} ${pinyin}`;
+    this.showSpeechBubble(tip, 1.8);
+    AudioManager.instance.playTouchWord(this.word);
+  }
+
+  /**
+   * 展示头顶注音/提示气泡
+   */
+  public showSpeechBubble(text: string, duration: number = 1.4) {
+    this.bubbleText.text = text;
+    const paddingX = 14;
+    const tw = Math.max(68, this.bubbleText.width + paddingX * 2);
+    const th = 28;
+
+    this.bubbleBg.clear();
+    // 阴影
+    this.bubbleBg.beginFill(0x000000, 0.12);
+    this.bubbleBg.drawRoundedRect(-tw / 2, -th / 2 + 2, tw, th, 14);
+    this.bubbleBg.endFill();
+    // 白底边框
+    this.bubbleBg.beginFill(0xFFFFFF, 0.98);
+    this.bubbleBg.lineStyle(2, 0x00BCD4, 1);
+    this.bubbleBg.drawRoundedRect(-tw / 2, -th / 2, tw, th, 14);
+    // 底部小三角指引
+    this.bubbleBg.moveTo(-5, th / 2);
+    this.bubbleBg.lineTo(0, th / 2 + 5);
+    this.bubbleBg.lineTo(5, th / 2);
+    this.bubbleBg.endFill();
+
+    this.bubbleContainer.position.set(0, -this.r - 24);
+    this.bubbleContainer.alpha = 1;
+    this.bubbleContainer.visible = true;
+    this.bubbleTime = duration;
+  }
+
   public update(dt: number) {
     if (this.shakeTime > 0) {
       this.shakeTime -= dt;
@@ -132,6 +205,17 @@ export class TargetBlock extends PIXI.Container {
       this.scale.set(1 + squish, 1 - squish);
     } else {
       this.scale.set(1, 1);
+    }
+
+    if (this.bubbleTime > 0) {
+      this.bubbleTime -= dt;
+      this.bubbleContainer.y -= dt * 8;
+      if (this.bubbleTime < 0.4) {
+        this.bubbleContainer.alpha = Math.max(0, this.bubbleTime / 0.4);
+      }
+      if (this.bubbleTime <= 0) {
+        this.bubbleContainer.visible = false;
+      }
     }
   }
 
@@ -152,21 +236,19 @@ export class TargetBlock extends PIXI.Container {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    // 清新薄荷天青冰晶光学折射底色 (温润通透糖果感，移除 #006064 等暗沉深色)
     const bodyGrad = ctx.createRadialGradient(
       cx + r * 0.22, cy + r * 0.25, r * 0.05,
       cx - r * 0.1, cy - r * 0.1, r * 1.05
     );
-    bodyGrad.addColorStop(0.0, '#FFFFFF'); // 右下清透极亮聚光点
-    bodyGrad.addColorStop(0.18, '#E0F7FA'); // 晶莹冰晶透亮薄荷
-    bodyGrad.addColorStop(0.42, '#B2EBF2'); // 柔和纯净天青水蓝
-    bodyGrad.addColorStop(0.68, '#80DEEA'); // 清新通透薄荷琉璃
-    bodyGrad.addColorStop(0.88, '#4DD0E1'); // 鲜活明快海青色
-    bodyGrad.addColorStop(1.0, '#26C6DA'); // 边缘清新水绿 (告别 #006064、#00838F 等沉闷暗深色)
+    bodyGrad.addColorStop(0.0, '#FFFFFF');
+    bodyGrad.addColorStop(0.18, '#E0F7FA');
+    bodyGrad.addColorStop(0.42, '#B2EBF2');
+    bodyGrad.addColorStop(0.68, '#80DEEA');
+    bodyGrad.addColorStop(0.88, '#4DD0E1');
+    bodyGrad.addColorStop(1.0, '#26C6DA');
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 球体边缘厚度遮罩 (水蓝微暗环境光，告别生硬黑圈)
     const depthGrad = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
     depthGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0)');
     depthGrad.addColorStop(0.80, 'rgba(77, 208, 225, 0)');
@@ -174,7 +256,6 @@ export class TargetBlock extends PIXI.Container {
     ctx.fillStyle = depthGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 水晶中心悬浮透亮光核 (明亮通透内部光晕)
     const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.68);
     coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.58)');
     coreGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.18)');
@@ -206,7 +287,6 @@ export class TargetBlock extends PIXI.Container {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    // 1. 球顶漫反射覆膜
     const domeGrad = ctx.createRadialGradient(
       cx, cy - r * 0.7, r * 0.05,
       cx, cy - r * 0.2, r * 0.95
@@ -218,7 +298,6 @@ export class TargetBlock extends PIXI.Container {
     ctx.fillStyle = domeGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 2. 左上优雅弧形天光高光
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r * 0.75, -Math.PI * 0.88, -Math.PI * 0.26);
@@ -236,7 +315,6 @@ export class TargetBlock extends PIXI.Container {
     ctx.stroke();
     ctx.restore();
 
-    // 3. 左上方极锐利微小星芒高光点
     const glintX = cx - r * 0.42;
     const glintY = cy - r * 0.42;
     const flareGrad = ctx.createRadialGradient(glintX, glintY, 0, glintX, glintY, r * 0.18);
@@ -253,7 +331,6 @@ export class TargetBlock extends PIXI.Container {
     ctx.arc(glintX, glintY, 2.5 * dpr, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. 右下方反向微弱漫反射环境反光
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r - 2.2 * dpr, 0.22 * Math.PI, 0.62 * Math.PI);
@@ -263,9 +340,8 @@ export class TargetBlock extends PIXI.Container {
     ctx.stroke();
     ctx.restore();
 
-    ctx.restore(); // 释放剪裁
+    ctx.restore();
 
-    // 5. 玻璃外壁菲涅尔光滑轮廓环
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r - 0.75 * dpr, 0, Math.PI * 2);
