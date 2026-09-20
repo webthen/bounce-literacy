@@ -251,32 +251,120 @@
     }
     @keyframes bounceSpeaker { from { transform: scale(1); } to { transform: scale(1.18); } }
 
-    /* 关卡生字导读卡片 */
+    /* 关卡生字导读弹窗及滚动排版 */
+    .intro-card-modal {
+      width: 580px !important;
+      max-width: 92vw !important;
+      max-height: 88vh !important;
+      max-height: 88dvh !important;
+      display: flex;
+      flex-direction: column;
+      padding: 22px 20px 16px 20px;
+      box-sizing: border-box;
+      overflow: hidden !important;
+    }
+    .intro-modal-header {
+      flex-shrink: 0;
+      text-align: center;
+      margin-bottom: 6px;
+    }
+    .intro-header-icon {
+      font-size: 32px;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .intro-title {
+      font-size: 24px;
+      color: #E65100;
+      margin: 0;
+      font-weight: bold;
+    }
+    .intro-subtitle {
+      font-size: 13px;
+      color: #795548;
+      margin: 4px 0 0;
+    }
+    .intro-cards-scroll-wrapper {
+      flex: 1 1 auto;
+      min-height: 120px;
+      max-height: 52vh;
+      max-height: 52dvh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      padding: 6px 6px 12px;
+      margin: 6px 0;
+      touch-action: pan-y;
+    }
+    .intro-cards-scroll-wrapper::-webkit-scrollbar {
+      width: 6px;
+    }
+    .intro-cards-scroll-wrapper::-webkit-scrollbar-thumb {
+      background: #FFD54F;
+      border-radius: 4px;
+    }
+    .intro-cards-scroll-wrapper::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 4px;
+    }
     .intro-cards-container {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 14px;
-      margin: 16px 0;
+      gap: 12px;
+      margin: 0;
     }
     .intro-word-card {
       background: #FFFDE7;
       border: 3px solid #FFD54F;
-      border-radius: 20px;
-      padding: 14px 18px;
-      min-width: 100px;
+      border-radius: 18px;
+      padding: 10px 14px;
+      min-width: 88px;
       display: flex;
       flex-direction: column;
       align-items: center;
       cursor: pointer;
-      box-shadow: 0 6px 14px rgba(255, 193, 7, 0.25);
-      transition: transform 0.15s, border-color 0.15s;
+      box-shadow: 0 4px 12px rgba(255, 193, 7, 0.22);
+      transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+      flex: 0 0 auto;
+      user-select: none;
+      -webkit-user-select: none;
     }
-    .intro-word-card:active { transform: scale(0.93); border-color: #FFA000; }
-    .intro-card-pinyin { font-size: 16px; color: #F57F17; font-weight: bold; }
-    .intro-card-char { font-size: 50px; font-weight: 900; color: #2B2D42; margin: 4px 0; line-height: 1.1; }
-    .intro-card-phrase { font-size: 14px; color: #5D4037; font-weight: bold; background: #FFF9C4; padding: 2px 10px; border-radius: 10px; }
-    .intro-card-voice { font-size: 15px; margin-top: 6px; color: #FFA000; }
+    .intro-word-card:active {
+      transform: scale(0.93);
+      border-color: #FFA000;
+      box-shadow: 0 2px 6px rgba(255, 160, 0, 0.3);
+    }
+    .intro-card-pinyin { font-size: 15px; color: #F57F17; font-weight: bold; }
+    .intro-card-char { font-size: 42px; font-weight: 900; color: #2B2D42; margin: 2px 0; line-height: 1.1; }
+    .intro-card-phrase { font-size: 13px; color: #5D4037; font-weight: bold; background: #FFF9C4; padding: 2px 8px; border-radius: 10px; }
+    .intro-card-voice { font-size: 13px; margin-top: 4px; color: #FFA000; }
+    .intro-modal-footer {
+      flex-shrink: 0;
+      padding-top: 10px;
+      border-top: 1px dashed rgba(255, 160, 0, 0.25);
+      width: 100%;
+      display: flex;
+      justify-content: center;
+    }
+    .btn-start-intro {
+      font-size: 20px;
+      padding: 10px 42px;
+      margin: 0;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #4CAF50, #2E7D32);
+      box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+      animation: pulseStartIntro 2s infinite;
+      cursor: pointer;
+      user-select: none;
+    }
+    @keyframes pulseStartIntro {
+      0%, 100% { transform: scale(1); box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4); }
+      50% { transform: scale(1.04); box-shadow: 0 8px 22px rgba(76, 175, 80, 0.55); }
+    }
+    .btn-start-intro:active {
+      transform: scale(0.96) !important;
+    }
 
     /* 通关识字复习卡片 */
     .win-word-card {
@@ -390,6 +478,10 @@
       background: #FFF;
       width: 520px;
       max-width: 90%;
+      max-height: 90vh;
+      max-height: 90dvh;
+      overflow-y: auto;
+      box-sizing: border-box;
       border-radius: 28px;
       padding: 30px;
       text-align: center;
@@ -775,6 +867,58 @@
         font-size: 13px;
         margin: 10px 0;
       }
+      .intro-card-modal {
+        width: 92vw !important;
+        max-width: 440px !important;
+        padding: 16px 14px 12px !important;
+        max-height: 86vh !important;
+        max-height: 86dvh !important;
+      }
+      .intro-cards-scroll-wrapper {
+        max-height: 50vh !important;
+        max-height: 50dvh !important;
+        padding: 4px !important;
+      }
+      .intro-word-card {
+        min-width: 80px;
+        padding: 8px 10px;
+      }
+      .intro-card-char {
+        font-size: 36px;
+      }
+      .btn-start-intro {
+        font-size: 18px !important;
+        padding: 9px 34px !important;
+      }
+    }
+
+    /* 低高度/紧凑横屏响应式适配 (如手机横屏高度 <= 540px) */
+    @media (max-height: 540px) {
+      .intro-card-modal {
+        padding: 8px 14px 8px !important;
+        max-height: 96vh !important;
+        max-height: 96dvh !important;
+      }
+      .intro-header-icon { display: none; }
+      .intro-title { font-size: 17px !important; }
+      .intro-subtitle { font-size: 12px !important; margin: 2px 0 0 !important; }
+      .intro-cards-scroll-wrapper {
+        max-height: 48vh !important;
+        max-height: 48dvh !important;
+        padding: 2px 4px !important;
+      }
+      .intro-word-card {
+        min-width: 72px;
+        padding: 6px 8px;
+      }
+      .intro-card-pinyin { font-size: 12px; }
+      .intro-card-char { font-size: 28px; }
+      .intro-card-phrase { font-size: 11px; }
+      .intro-card-voice { font-size: 11px; margin-top: 2px; }
+      .btn-start-intro {
+        font-size: 15px !important;
+        padding: 6px 24px !important;
+      }
     }
   </style>
 </head>
@@ -834,14 +978,20 @@
       </div>
     </div>
 
-    <!-- 关卡生字导读/预览弹窗 -->
+    <!-- 关卡生字导读/预览弹窗 (三段式：固定头部提示、独立滚动的生字列表、常驻吸底的开始弹射按钮) -->
     <div class="modal-mask" id="intro-modal">
-      <div class="card" style="width: 580px;">
-        <div style="font-size:36px; margin-bottom:4px;">📖✨</div>
-        <h2 style="font-size:26px; color:#E65100;" id="intro-title">认识本关汉字朋友</h2>
-        <p style="font-size:14px; color:#795548; margin:6px 0 14px;">动动小手点一点，听听它们怎么读吧！</p>
-        <div class="intro-cards-container" id="intro-cards-container"></div>
-        <button class="btn-main" id="btn-start-level-play" style="font-size:22px; padding:12px 42px; margin-top:14px;">🚀 开始弹射！</button>
+      <div class="card intro-card-modal">
+        <div class="intro-modal-header">
+          <div class="intro-header-icon">📖✨</div>
+          <h2 class="intro-title" id="intro-title">认识本关汉字朋友</h2>
+          <p class="intro-subtitle">动动小手点一点，听听它们怎么读吧！</p>
+        </div>
+        <div class="intro-cards-scroll-wrapper">
+          <div class="intro-cards-container" id="intro-cards-container"></div>
+        </div>
+        <div class="intro-modal-footer">
+          <button class="btn-main btn-start-intro" id="btn-start-level-play">🚀 开始弹射！</button>
+        </div>
       </div>
     </div>
 
