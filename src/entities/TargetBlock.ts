@@ -47,17 +47,17 @@ export class TargetBlock extends PIXI.Container {
     this.sphereSprite.height = this.r * 2 + 16;
     this.addChild(this.sphereSprite);
 
-    // 4. 水晶球内嵌汉字 (字号适中饱满，留出玻璃球壁厚度)
+    // 4. 水晶球内嵌汉字 (字号适中饱满，清新明亮高辨识度)
     this.wordShadowText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", sans-serif',
       fontSize: 46,
       fontWeight: '900',
-      fill: 0x004D40,
+      fill: 0x00838F,
       align: 'center'
     });
     this.wordShadowText.anchor.set(0.5);
-    this.wordShadowText.y = 3;
-    this.wordShadowText.alpha = 0.7;
+    this.wordShadowText.y = 2.5;
+    this.wordShadowText.alpha = 0.32;
     this.addChild(this.wordShadowText);
 
     this.wordText = new PIXI.Text(word, {
@@ -65,8 +65,8 @@ export class TargetBlock extends PIXI.Container {
       fontSize: 46,
       fontWeight: '900',
       fill: 0xFFFFFF,
-      stroke: 0x00838F,
-      strokeThickness: 2.5,
+      stroke: 0x00ACC1,
+      strokeThickness: 2.2,
       align: 'center'
     });
     this.wordText.anchor.set(0.5);
@@ -82,7 +82,7 @@ export class TargetBlock extends PIXI.Container {
     // 6. 艾宾浩斯复习专属小标识
     if (isReview) {
       const tagGfx = new PIXI.Graphics();
-      tagGfx.beginFill(0xFF9800);
+      tagGfx.beginFill(0xFFA000);
       tagGfx.lineStyle(1.5, 0xFFFFFF, 1);
       tagGfx.drawRoundedRect(this.r * 0.28, -this.r * 0.95, 28, 18, 9);
       tagGfx.endFill();
@@ -101,14 +101,14 @@ export class TargetBlock extends PIXI.Container {
 
   private drawShadow() {
     this.shadowGfx.clear();
-    // 接触软阴影
-    this.shadowGfx.beginFill(0x1A237E, 0.18);
+    // 柔和清爽接触软阴影 (告别深海黑蓝色 0x1A237E)
+    this.shadowGfx.beginFill(0x546E7A, 0.12);
     this.shadowGfx.drawEllipse(0, this.r * 0.82, this.r * 0.95, this.r * 0.3);
     this.shadowGfx.endFill();
 
-    // 玻璃焦散微光
-    this.shadowGfx.beginFill(0x80DEEA, 0.45);
-    this.shadowGfx.drawEllipse(0, this.r * 0.82, this.r * 0.38, this.r * 0.12);
+    // 冰晶玻璃焦散微光
+    this.shadowGfx.beginFill(0xE0F7FA, 0.60);
+    this.shadowGfx.drawEllipse(0, this.r * 0.82, this.r * 0.42, this.r * 0.14);
     this.shadowGfx.endFill();
   }
 
@@ -152,32 +152,32 @@ export class TargetBlock extends PIXI.Container {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    // 天青水蓝水晶光学折射底色
+    // 清新薄荷天青冰晶光学折射底色 (温润通透糖果感，移除 #006064 等暗沉深色)
     const bodyGrad = ctx.createRadialGradient(
       cx + r * 0.22, cy + r * 0.25, r * 0.05,
       cx - r * 0.1, cy - r * 0.1, r * 1.05
     );
-    bodyGrad.addColorStop(0.0, '#E0F7FA'); // 右下内焦散聚光
-    bodyGrad.addColorStop(0.2, '#80DEEA'); // 晶莹浅蓝透亮
-    bodyGrad.addColorStop(0.5, '#26C6DA'); // 饱满天青琉璃
-    bodyGrad.addColorStop(0.8, '#00ACC1'); // 纯净深水色
-    bodyGrad.addColorStop(0.95, '#00838F'); // 边缘吸收暗部
-    bodyGrad.addColorStop(1.0, '#006064'); // 边缘轮廓深色
+    bodyGrad.addColorStop(0.0, '#FFFFFF'); // 右下清透极亮聚光点
+    bodyGrad.addColorStop(0.18, '#E0F7FA'); // 晶莹冰晶透亮薄荷
+    bodyGrad.addColorStop(0.42, '#B2EBF2'); // 柔和纯净天青水蓝
+    bodyGrad.addColorStop(0.68, '#80DEEA'); // 清新通透薄荷琉璃
+    bodyGrad.addColorStop(0.88, '#4DD0E1'); // 鲜活明快海青色
+    bodyGrad.addColorStop(1.0, '#26C6DA'); // 边缘清新水绿 (告别 #006064、#00838F 等沉闷暗深色)
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 球体边缘厚度遮罩
+    // 球体边缘厚度遮罩 (水蓝微暗环境光，告别生硬黑圈)
     const depthGrad = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
-    depthGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-    depthGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.08)');
-    depthGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.26)');
+    depthGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0)');
+    depthGrad.addColorStop(0.80, 'rgba(77, 208, 225, 0)');
+    depthGrad.addColorStop(1.0, 'rgba(0, 151, 167, 0.10)');
     ctx.fillStyle = depthGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 水晶中心悬浮透亮光核
+    // 水晶中心悬浮透亮光核 (明亮通透内部光晕)
     const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.68);
-    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.45)');
-    coreGrad.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.58)');
+    coreGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.18)');
     coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = coreGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);

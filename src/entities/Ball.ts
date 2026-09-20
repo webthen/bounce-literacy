@@ -36,17 +36,17 @@ export class Ball extends PIXI.Container {
     this.sphereSprite.height = this.r * 2 + 16;
     this.addChild(this.sphereSprite);
 
-    // 4. 水晶内嵌汉字 (悬浮在水晶球内部，大字号极其醒目)
+    // 4. 水晶内嵌汉字 (悬浮在水晶球内部，大字号清新醒目)
     this.wordShadowText = new PIXI.Text(word, {
       fontFamily: '"PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", sans-serif',
       fontSize: 48,
       fontWeight: '900',
-      fill: 0x7A1800,
+      fill: 0xF57C00,
       align: 'center'
     });
     this.wordShadowText.anchor.set(0.5);
-    this.wordShadowText.y = 3;
-    this.wordShadowText.alpha = 0.7;
+    this.wordShadowText.y = 2.5;
+    this.wordShadowText.alpha = 0.35;
     this.addChild(this.wordShadowText);
 
     this.wordText = new PIXI.Text(word, {
@@ -54,8 +54,8 @@ export class Ball extends PIXI.Container {
       fontSize: 48,
       fontWeight: '900',
       fill: 0xFFFFFF,
-      stroke: 0xD84315,
-      strokeThickness: 2.5,
+      stroke: 0xF57C00,
+      strokeThickness: 2.2,
       align: 'center'
     });
     this.wordText.anchor.set(0.5);
@@ -73,21 +73,21 @@ export class Ball extends PIXI.Container {
     return this.trailGfx;
   }
 
-  /** 绘制球体在桌面/地面上的立体接触阴影与玻璃透光焦散光斑 */
+  /** 绘制球体在桌面/地面上的立体接触阴影与玻璃透光焦散光斑 (清新柔和透亮) */
   private drawShadow() {
     this.shadowGfx.clear();
-    // 1. 接触软阴影
-    this.shadowGfx.beginFill(0x281914, 0.28);
+    // 1. 柔和温润接触软阴影 (告别黑褐色暗沉)
+    this.shadowGfx.beginFill(0x8D6E63, 0.16);
     this.shadowGfx.drawEllipse(0, this.r * 0.85, this.r * 1.12, this.r * 0.35);
     this.shadowGfx.endFill();
 
     // 2. 玻璃折射透光焦散亮点 (Caustic spotlight under glass)
-    this.shadowGfx.beginFill(0xFFF59D, 0.58);
-    this.shadowGfx.drawEllipse(0, this.r * 0.85, this.r * 0.44, this.r * 0.14);
+    this.shadowGfx.beginFill(0xFFF9C4, 0.65);
+    this.shadowGfx.drawEllipse(0, this.r * 0.85, this.r * 0.46, this.r * 0.15);
     this.shadowGfx.endFill();
   }
 
-  /** 生成超清 3D 晶莹剔透玻璃球体底纹 (带凸透镜光学折射与焦散聚光) */
+  /** 生成超清 3D 晶莹剔透玻璃球体底纹 (清新明媚蜜糖柠檬暖阳配色，去暗沉深色) */
   private generateSphereTexture(): PIXI.Texture {
     const dpr = 2;
     const r = this.r * dpr;
@@ -106,32 +106,32 @@ export class Ball extends PIXI.Container {
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.clip();
 
-    // 玻璃透光折射底色：光线从左上入射，通过光学凸透镜在右下方形成温暖明亮的焦散聚光
+    // 玻璃透光折射底色：清新柔和明丽的阳光蜜糖琉璃质感，杜绝焦黑棕色
     const bodyGrad = ctx.createRadialGradient(
       cx + r * 0.22, cy + r * 0.25, r * 0.05,
       cx - r * 0.1, cy - r * 0.1, r * 1.05
     );
-    bodyGrad.addColorStop(0.0, '#FFF9C4'); // 右下内焦散聚光
-    bodyGrad.addColorStop(0.2, '#FFE082'); // 晶莹琥珀透亮
-    bodyGrad.addColorStop(0.5, '#FFA726'); // 温暖橙金琉璃
-    bodyGrad.addColorStop(0.8, '#FB8C00'); // 饱满折射色
-    bodyGrad.addColorStop(0.95, '#E65100'); // 边缘吸收暗部
-    bodyGrad.addColorStop(1.0, '#BF360C'); // 边缘深色轮廓
+    bodyGrad.addColorStop(0.0, '#FFFFFF'); // 右下清透极亮焦点
+    bodyGrad.addColorStop(0.15, '#FFFDE7'); // 柔和温润奶白微光
+    bodyGrad.addColorStop(0.40, '#FFF59D'); // 清新明朗柠檬黄
+    bodyGrad.addColorStop(0.68, '#FFE082'); // 晶莹透亮蜜糖金
+    bodyGrad.addColorStop(0.88, '#FFB74D'); // 柔美蜜桃暖杏
+    bodyGrad.addColorStop(1.0, '#FFA726'); // 边缘清新活力果冻橙 (彻底移除 #BF360C 和 #E65100 等深焦暗色)
     ctx.fillStyle = bodyGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 球体边缘厚度遮罩 (环境光吸收)
+    // 球体边缘厚度遮罩 (温润暖调透光暗角，告别粗重黑圈)
     const depthGrad = ctx.createRadialGradient(cx, cy, r * 0.55, cx, cy, r);
-    depthGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0)');
-    depthGrad.addColorStop(0.85, 'rgba(0, 0, 0, 0.08)');
-    depthGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.28)');
+    depthGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0)');
+    depthGrad.addColorStop(0.80, 'rgba(255, 183, 77, 0)');
+    depthGrad.addColorStop(1.0, 'rgba(239, 108, 0, 0.10)');
     ctx.fillStyle = depthGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
 
-    // 水晶中心悬浮透亮光核 (营造深邃的内部空间)
+    // 水晶中心悬浮透亮光核 (明亮通透内部光晕)
     const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r * 0.68);
-    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.42)');
-    coreGrad.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.58)');
+    coreGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.18)');
     coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
     ctx.fillStyle = coreGrad;
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
@@ -270,7 +270,7 @@ export class Ball extends PIXI.Container {
     for (let i = 0; i < this.trailHistory.length; i++) {
       const p = this.trailHistory[i];
       const ratio = (i + 1) / this.trailHistory.length;
-      this.trailGfx.beginFill(0xFFD54F, ratio * 0.28);
+      this.trailGfx.beginFill(0xFFE082, ratio * 0.25);
       this.trailGfx.drawCircle(p.x, p.y, this.r * (0.35 + ratio * 0.55));
       this.trailGfx.endFill();
     }

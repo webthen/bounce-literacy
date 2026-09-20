@@ -1716,13 +1716,13 @@ function render() {
         ctx.stroke();
       }
 
-      // 1. 悬浮软阴影与透光微焦散
-      ctx.fillStyle = 'rgba(26, 35, 126, 0.18)';
+      // 1. 悬浮软阴影与透光微焦散 (柔和清爽浅阴影)
+      ctx.fillStyle = 'rgba(84, 110, 122, 0.12)';
       ctx.beginPath();
       ctx.ellipse(0, r * 0.82, r * 0.95, r * 0.3, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 2. 晶莹剔透天青水晶玻璃球体
+      // 2. 晶莹剔透清新薄荷水晶玻璃球体
       ctx.save();
       ctx.beginPath();
       ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -1732,32 +1732,32 @@ function render() {
         r * 0.22, r * 0.25, r * 0.05,
         -r * 0.1, -r * 0.1, r * 1.05
       );
-      bodyGrad.addColorStop(0.0, '#E0F7FA');
-      bodyGrad.addColorStop(0.2, '#80DEEA');
-      bodyGrad.addColorStop(0.5, '#26C6DA');
-      bodyGrad.addColorStop(0.8, '#00ACC1');
-      bodyGrad.addColorStop(0.95, '#00838F');
-      bodyGrad.addColorStop(1.0, '#006064');
+      bodyGrad.addColorStop(0.0, '#FFFFFF'); // 焦点极亮聚光
+      bodyGrad.addColorStop(0.18, '#E0F7FA'); // 清新冰晶薄荷
+      bodyGrad.addColorStop(0.42, '#B2EBF2'); // 柔和纯净天青
+      bodyGrad.addColorStop(0.68, '#80DEEA'); // 清新通透水蓝
+      bodyGrad.addColorStop(0.88, '#4DD0E1'); // 鲜活海青
+      bodyGrad.addColorStop(1.0, '#26C6DA'); // 边缘清新水绿 (移除暗沉黑青色)
       ctx.fillStyle = bodyGrad;
       ctx.fillRect(-r, -r, r * 2, r * 2);
 
       const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 0.68);
-      coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.45)');
-      coreGrad.addColorStop(0.6, 'rgba(255, 255, 255, 0.15)');
+      coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.58)');
+      coreGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.18)');
       coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
       ctx.fillStyle = coreGrad;
       ctx.fillRect(-r, -r, r * 2, r * 2);
 
-      // 3. 悬浮汉字
+      // 3. 悬浮汉字 (清新明丽高对比)
       ctx.font = '900 46px "PingFang SC", "Microsoft YaHei", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = 'rgba(0, 77, 64, 0.7)';
-      ctx.fillText(b.word, 0.5, 3);
+      ctx.fillStyle = 'rgba(0, 131, 143, 0.32)';
+      ctx.fillText(b.word, 0.5, 2.5);
 
       ctx.fillStyle = '#FFFFFF';
-      ctx.strokeStyle = '#00838F';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#00ACC1';
+      ctx.lineWidth = 2.2;
       ctx.strokeText(b.word, 0, 0);
       ctx.fillText(b.word, 0, 0);
 
@@ -1875,36 +1875,48 @@ function render() {
     ctx.save();
     ctx.translate(bx, by);
 
-    // 阴影
-    ctx.fillStyle = 'rgba(26, 35, 126, 0.22)';
+    // 阴影 (柔和温润淡焦糖阴影)
+    ctx.fillStyle = 'rgba(141, 110, 99, 0.16)';
     ctx.beginPath();
     ctx.ellipse(0, br * 0.82, br * 0.95, br * 0.3, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 玻璃球体
+    // 玻璃球体 (清新阳光明媚蜜糖琉璃)
     ctx.save();
     ctx.beginPath();
     ctx.arc(0, 0, br, 0, Math.PI * 2);
     ctx.clip();
 
     const ballGrad = ctx.createRadialGradient(
-      br * 0.2, br * 0.2, br * 0.05,
+      br * 0.22, br * 0.25, br * 0.05,
       -br * 0.1, -br * 0.1, br * 1.05
     );
-    ballGrad.addColorStop(0.0, '#FFF9C4');
-    ballGrad.addColorStop(0.2, '#FFE082');
-    ballGrad.addColorStop(0.5, '#FFB300');
-    ballGrad.addColorStop(0.85, '#FF8F00');
-    ballGrad.addColorStop(1.0, '#E65100');
+    ballGrad.addColorStop(0.0, '#FFFFFF'); // 焦点极亮聚光
+    ballGrad.addColorStop(0.15, '#FFFDE7'); // 柔和奶白微光
+    ballGrad.addColorStop(0.40, '#FFF59D'); // 清新明朗柠檬黄
+    ballGrad.addColorStop(0.68, '#FFE082'); // 晶莹蜜糖透金
+    ballGrad.addColorStop(0.88, '#FFB74D'); // 柔美蜜桃暖杏
+    ballGrad.addColorStop(1.0, '#FFA726'); // 边缘清新果冻橙 (告别暗沉焦褐色)
     ctx.fillStyle = ballGrad;
     ctx.fillRect(-br, -br, br * 2, br * 2);
 
+    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, br * 0.68);
+    coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.58)');
+    coreGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.18)');
+    coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0)');
+    ctx.fillStyle = coreGrad;
+    ctx.fillRect(-br, -br, br * 2, br * 2);
+
+    // 悬浮汉字 (清新明丽高辨识度)
     ctx.font = '900 48px "PingFang SC", "Microsoft YaHei", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    ctx.fillStyle = 'rgba(245, 124, 0, 0.35)';
+    ctx.fillText(ball.word, 0.5, 2.5);
+
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#BF360C';
-    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = '#F57C00';
+    ctx.lineWidth = 2.2;
     ctx.strokeText(ball.word, 0, 0);
     ctx.fillText(ball.word, 0, 0);
 

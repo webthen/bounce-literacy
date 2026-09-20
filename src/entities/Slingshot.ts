@@ -87,7 +87,7 @@ export class Slingshot extends PIXI.Container {
         const progress = s / totalSteps;
         const dotRadius = Math.max(3.2, 6.5 - progress * 2.8);
 
-        this.trajectoryGfx.beginFill(0xFFA000, 0.92);
+        this.trajectoryGfx.beginFill(0xFFB300, 0.92);
         this.trajectoryGfx.drawCircle(curX, curY, dotRadius);
         this.trajectoryGfx.endFill();
 
