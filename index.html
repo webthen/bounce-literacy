@@ -366,24 +366,158 @@
       transform: scale(0.96) !important;
     }
 
-    /* 通关识字复习卡片 */
+    /* 通关结算弹窗及生字回顾独立滚动排版 */
+    .win-card-modal {
+      width: 560px !important;
+      max-width: 92vw !important;
+      max-height: 88vh !important;
+      max-height: 88dvh !important;
+      display: flex;
+      flex-direction: column;
+      padding: 20px 20px 16px 20px;
+      box-sizing: border-box;
+      overflow: hidden !important;
+    }
+    .win-modal-header {
+      flex-shrink: 0;
+      text-align: center;
+      margin-bottom: 4px;
+    }
+    .win-modal-title {
+      font-size: 26px;
+      color: #FFA000;
+      margin: 0;
+      font-weight: 900;
+      line-height: 1.2;
+    }
+    .win-stars {
+      font-size: 34px;
+      margin: 2px 0 4px;
+      line-height: 1;
+      color: #FFD700;
+      text-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
+    }
+    .win-summary {
+      font-size: 16px;
+      color: #5D4037;
+      font-weight: bold;
+      margin: 2px 0;
+    }
+    .win-unlocked-tip {
+      font-size: 13px;
+      color: #4CAF50;
+      margin: 2px 0 6px;
+    }
+    .win-review-box {
+      background: #FFFDE7;
+      border: 2px solid #FFE082;
+      border-radius: 18px;
+      padding: 8px 10px;
+      margin: 4px 0 8px;
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 90px;
+      max-height: 42vh;
+      max-height: 42dvh;
+      overflow: hidden;
+      box-sizing: border-box;
+    }
+    .win-review-title {
+      font-size: 14px;
+      font-weight: bold;
+      color: #F57F17;
+      margin-bottom: 6px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+    .win-words-scroll-wrapper {
+      flex: 1 1 auto;
+      overflow-y: auto;
+      overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+      padding: 2px 4px 6px;
+    }
+    .win-words-scroll-wrapper::-webkit-scrollbar {
+      width: 6px;
+    }
+    .win-words-scroll-wrapper::-webkit-scrollbar-thumb {
+      background: #FFB300;
+      border-radius: 4px;
+    }
+    .win-words-scroll-wrapper::-webkit-scrollbar-track {
+      background: rgba(255, 179, 0, 0.1);
+      border-radius: 4px;
+    }
+    .win-words-gallery {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 0;
+    }
     .win-word-card {
       background: #FFFFFF;
       border: 2px solid #FFA000;
-      border-radius: 16px;
-      padding: 8px 14px;
+      border-radius: 14px;
+      padding: 6px 12px;
       display: flex;
       flex-direction: column;
       align-items: center;
       cursor: pointer;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.08);
-      transition: transform 0.12s;
+      box-shadow: 0 3px 8px rgba(255, 160, 0, 0.18);
+      transition: transform 0.12s, box-shadow 0.12s;
+      flex: 0 0 auto;
+      user-select: none;
+      -webkit-user-select: none;
     }
-    .win-word-card:active { transform: scale(0.92); }
+    .win-word-card:active {
+      transform: scale(0.92);
+      box-shadow: 0 1px 4px rgba(255, 160, 0, 0.3);
+    }
     .win-word-pinyin { font-size: 13px; color: #FFA000; font-weight: bold; }
-    .win-word-char { font-size: 36px; font-weight: 900; color: #333; line-height: 1.1; }
-    .win-word-phrase { font-size: 12px; color: #5D4037; font-weight: bold; }
-    .win-word-speaker { font-size: 14px; color: #FFA000; margin-top: 2px; }
+    .win-word-char { font-size: 34px; font-weight: 900; color: #2B2D42; line-height: 1.1; margin: 1px 0; }
+    .win-word-phrase { font-size: 12px; color: #5D4037; font-weight: bold; background: #FFF9C4; padding: 1px 8px; border-radius: 8px; }
+    .win-word-speaker { font-size: 12px; color: #FF9800; margin-top: 2px; font-weight: bold; }
+    .win-modal-footer {
+      flex-shrink: 0;
+      padding-top: 8px;
+      border-top: 1px dashed rgba(255, 160, 0, 0.25);
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-win-next {
+      font-size: 20px;
+      padding: 10px 48px;
+      margin: 0;
+      border-radius: 24px;
+      background: linear-gradient(135deg, #4CAF50, #2E7D32);
+      box-shadow: 0 6px 16px rgba(76, 175, 80, 0.45);
+      color: #FFF;
+      cursor: pointer;
+      animation: pulseNextBtn 1.8s infinite;
+      user-select: none;
+    }
+    @keyframes pulseNextBtn {
+      0%, 100% { transform: scale(1); box-shadow: 0 6px 16px rgba(76, 175, 80, 0.45); }
+      50% { transform: scale(1.04); box-shadow: 0 8px 22px rgba(76, 175, 80, 0.65); }
+    }
+    .btn-win-next:active {
+      transform: scale(0.96) !important;
+    }
+    .btn-win-retry {
+      font-size: 14px;
+      padding: 5px 18px;
+      margin: 0;
+      border-radius: 14px;
+      background: #B0BEC5;
+      color: #FFF;
+      cursor: pointer;
+    }
 
     /* 我的识字本 */
     .book-grid {
@@ -890,6 +1024,33 @@
         font-size: 18px !important;
         padding: 9px 34px !important;
       }
+      .win-card-modal {
+        width: 92vw !important;
+        max-width: 440px !important;
+        padding: 16px 14px 12px !important;
+        max-height: 86vh !important;
+        max-height: 86dvh !important;
+      }
+      .win-modal-title { font-size: 22px !important; }
+      .win-stars { font-size: 28px !important; margin: 2px 0 !important; }
+      .win-summary { font-size: 14px !important; }
+      .win-unlocked-tip { font-size: 12px !important; margin: 1px 0 4px !important; }
+      .win-review-box {
+        max-height: 40vh !important;
+        max-height: 40dvh !important;
+        padding: 6px 8px !important;
+        margin: 4px 0 6px !important;
+      }
+      .win-word-card {
+        padding: 5px 8px !important;
+      }
+      .win-word-char {
+        font-size: 28px !important;
+      }
+      .btn-win-next {
+        font-size: 18px !important;
+        padding: 9px 36px !important;
+      }
     }
 
     /* 低高度/紧凑横屏响应式适配 (如手机横屏高度 <= 540px) */
@@ -918,6 +1079,43 @@
       .btn-start-intro {
         font-size: 15px !important;
         padding: 6px 24px !important;
+      }
+      .win-card-modal {
+        padding: 8px 14px 8px !important;
+        max-height: 96vh !important;
+        max-height: 96dvh !important;
+      }
+      .win-modal-title { font-size: 18px !important; }
+      .win-stars { font-size: 20px !important; margin: 0 !important; }
+      .win-summary { font-size: 13px !important; }
+      .win-unlocked-tip { display: none; }
+      .win-review-box {
+        max-height: 42vh !important;
+        max-height: 42dvh !important;
+        padding: 4px 6px !important;
+        margin: 2px 0 4px !important;
+      }
+      .win-review-title { font-size: 12px !important; margin-bottom: 2px !important; }
+      .win-word-card {
+        padding: 4px 8px !important;
+      }
+      .win-word-pinyin { font-size: 11px !important; }
+      .win-word-char { font-size: 24px !important; }
+      .win-word-phrase { font-size: 10px !important; }
+      .win-word-speaker { display: none; }
+      .win-modal-footer {
+        flex-direction: row !important;
+        justify-content: center !important;
+        gap: 12px !important;
+        padding-top: 4px !important;
+      }
+      .btn-win-next {
+        font-size: 15px !important;
+        padding: 6px 24px !important;
+      }
+      .btn-win-retry {
+        font-size: 13px !important;
+        padding: 6px 14px !important;
       }
     }
   </style>
@@ -1018,22 +1216,28 @@
       </div>
     </div>
 
-    <!-- 通关结算弹窗 -->
+    <!-- 通关结算弹窗 (三段式：固定通关祝贺头部、独立滚动的掌握生字列表、常驻吸底的下一关按钮) -->
     <div class="modal-mask" id="win-modal">
-      <div class="card" style="width: 560px;">
-        <h2 style="font-size:32px; color:#FFA000;">★ 太 棒 啦 ！★</h2>
-        <div style="font-size:46px; margin: 8px 0; color:#FFD700;">⭐⭐⭐</div>
-        <p style="font-size:18px; color:#5D4037; font-weight:bold;" id="win-summary">掌握汉字！</p>
-        <p style="font-size:14px; color:#4CAF50; margin:6px 0;" id="win-unlocked-tip"></p>
+      <div class="card win-card-modal">
+        <div class="win-modal-header">
+          <h2 class="win-modal-title">★ 太 棒 啦 ！★</h2>
+          <div class="win-stars">⭐⭐⭐</div>
+          <p class="win-summary" id="win-summary">掌握汉字！</p>
+          <p class="win-unlocked-tip" id="win-unlocked-tip"></p>
+        </div>
         
-        <!-- 本关识字成果回顾区 -->
-        <div style="background:#FFF9C4; border:2px solid #FFE082; border-radius:18px; padding:12px; margin:12px 0;">
-          <div style="font-size:15px; font-weight:bold; color:#F57F17; margin-bottom:8px;">🌟 本关掌握汉字（点击复听朗读）</div>
-          <div id="win-words-gallery" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px;"></div>
+        <!-- 本关识字成果回顾区 (带独立滚动条，无论多少字均不挤占底部按钮) -->
+        <div class="win-review-box">
+          <div class="win-review-title">🌟 本关掌握汉字（点击复听朗读）</div>
+          <div class="win-words-scroll-wrapper">
+            <div class="win-words-gallery" id="win-words-gallery"></div>
+          </div>
         </div>
 
-        <button class="btn-main" id="modal-next-btn">下一关 ➔</button><br>
-        <button class="btn-close" id="modal-retry-btn">再玩一次</button>
+        <div class="win-modal-footer">
+          <button class="btn-main btn-win-next" id="modal-next-btn">下一关 ➔</button>
+          <button class="btn-close btn-win-retry" id="modal-retry-btn">🔄 再玩一次</button>
+        </div>
       </div>
     </div>
 
