@@ -36,3 +36,6 @@ Thumbs.db
 # Temporary files
 *.tmp
 .tempmediaStorage/
+
+# WeChat Miniprogram private developer configs
+project.private.config.json

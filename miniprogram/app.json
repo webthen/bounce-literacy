@@ -1,0 +1,16 @@
+{
+  "pages": [
+    "pages/index/index"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#FFF9E6",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "奇趣弹弹幼儿乐学",
+    "backgroundColor": "#FFF9E6",
+    "backgroundTextStyle": "light",
+    "navigationStyle": "custom",
+    "pageOrientation": "auto"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

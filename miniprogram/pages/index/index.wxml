@@ -1,0 +1,291 @@
+<!-- miniprogram/pages/index/index.wxml -->
+<view class="container">
+  <!-- 物理弹球主画布 (支持真机 2D 硬件加速) -->
+  <canvas 
+    type="2d" 
+    id="gameCanvas" 
+    class="game-canvas" 
+    bindtouchstart="handleTouchStart" 
+    bindtouchmove="handleTouchMove" 
+    bindtouchend="handleTouchEnd"
+  ></canvas>
+
+  <!-- 顶部两层式游戏 HUD 栏 (适配微信胶囊与刘海安全区) -->
+  <view class="hud-wrapper" wx:if="{{isPlaying}}">
+    <!-- 第一层：状态与操作栏 (与右上角微信胶囊严格平齐对齐，右侧留足胶囊安全边距) -->
+    <view 
+      class="hud-top-bar" 
+      style="top: {{menuTop}}px; height: {{menuHeight}}px; padding-right: {{capsulePaddingRight}}px;"
+    >
+      <view class="hud-bar-left">
+        <view class="hud-pill badge-level">第 {{currentLevel + 1}} 关</view>
+        <view class="hud-pill badge-score">⭐ {{score}}</view>
+      </view>
+      <view class="hud-bar-right">
+        <view class="btn-hud-icon" bindtap="toggleMute">{{isMuted ? '🔇' : '🔊'}}</view>
+        <view class="btn-hud-icon" bindtap="openPauseModal">⏸</view>
+      </view>
+    </view>
+
+    <!-- 第二层：目标汉字任务栏 (独占居中一行，超大清晰，带拼音、词组与语音播报) -->
+    <view 
+      class="hud-mission-row" 
+      style="top: {{missionTop}}px;"
+    >
+      <view class="mission-pill" bindtap="playTargetAudio">
+        <text class="mission-target-icon">🎯 找一找:</text>
+        <view class="mission-char-box">
+          <text class="mission-pinyin">{{targetPinyin}}</text>
+          <text class="mission-word">{{targetWord}}</text>
+        </view>
+        <text class="mission-phrase">{{targetPhrase}}</text>
+        <view class="mission-speaker-btn">
+          <text class="mission-speaker">🔊</text>
+          <text class="mission-speaker-text">读音</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 连击提示浮层 (位于任务栏下方，自动避开目标) -->
+    <view 
+      class="combo-badge" 
+      style="top: {{comboTop}}px;" 
+      wx:if="{{combo > 1}}"
+    >🔥 连击 x{{combo}}!</view>
+  </view>
+
+  <!-- 击中大字浮层 (动效闪现) -->
+  <view class="big-word-popup {{showBigWord ? 'show' : ''}}">
+    <view class="big-word-pinyin">{{hitPinyin}}</view>
+    <view class="big-word-char">{{hitWord}}</view>
+    <view class="big-word-phrase">{{hitPhrase}}</view>
+    <view class="big-word-pts">+{{hitPts}} 命中!</view>
+  </view>
+
+  <!-- 首页开始界面 (添加安全顶部边距避让刘海和胶囊) -->
+  <view class="start-screen" style="padding-top: {{startPaddingTop}}px;" wx:if="{{!isPlaying}}">
+    <view class="title-logo">★ 弹弹识字 ★</view>
+    <view class="title-subtitle">动动小手弹一弹，快乐认字每一天</view>
+
+    <!-- 等级选择卡片 -->
+    <view class="grade-pill-box">
+      <view class="grade-label">📚 选择识字等级（艾宾浩斯记忆体系 · 共5级300字）</view>
+      <view class="grade-btn-group">
+        <view 
+          wx:for="{{[1, 2, 3, 4, 5]}}" 
+          wx:key="*this" 
+          class="btn-grade {{currentGrade === item ? 'active' : ''}}"
+          bindtap="selectGrade"
+          data-grade="{{item}}"
+        >第 {{item}} 级</view>
+      </view>
+      <view class="grade-tip-text">{{gradeTips[currentGrade]}}</view>
+    </view>
+
+    <!-- 开始按钮 -->
+    <view class="btn-start-huge" bindtap="startGame">▶ 开 始</view>
+
+    <!-- 导航辅助入口 -->
+    <view class="start-nav-row">
+      <view class="btn-sub bg-orange" bindtap="openBookModal">📖 我的识字本</view>
+      <view class="btn-sub bg-amber" bindtap="openMonsterModal">🏆 小怪兽图鉴</view>
+      <view class="btn-sub bg-blue" bindtap="openParentGate">👨‍👩‍👦 家长中心</view>
+    </view>
+  </view>
+
+  <!-- 关卡生字导读/预览弹窗 -->
+  <view class="modal-mask" wx:if="{{showIntroModal}}">
+    <view class="card intro-card-modal">
+      <view class="intro-modal-header">
+        <view class="modal-icon">📖✨</view>
+        <view class="modal-title color-orange">认识本关汉字朋友</view>
+        <view class="modal-subtitle">动动小手点一点，听听它们怎么读吧！</view>
+      </view>
+
+      <scroll-view scroll-y="true" class="intro-cards-scroll-wrapper">
+        <view class="intro-cards-container">
+          <view 
+            wx:for="{{introWords}}" 
+            wx:key="char" 
+            class="intro-word-card" 
+            bindtap="playIntroWord" 
+            data-word="{{item.char}}"
+          >
+            <text class="intro-pinyin">{{item.pinyin}}</text>
+            <text class="intro-char">{{item.char}}</text>
+            <text class="intro-phrase">{{item.phrase}}</text>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="intro-modal-footer">
+        <view class="btn-main btn-start-intro" bindtap="confirmStartLevel">🚀 开始弹射！</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 游戏暂停弹窗 -->
+  <view class="modal-mask" wx:if="{{showPauseModal}}">
+    <view class="card">
+      <view class="modal-title color-amber">游戏暂停</view>
+      <view class="btn-main" bindtap="resumeGame">▶ 继续游戏</view>
+      <view class="btn-sub bg-amber" bindtap="retryLevel">🔄 重新开始本关</view>
+      <view class="btn-sub bg-brown" bindtap="quitToMenu">🏠 返回主菜单</view>
+    </view>
+  </view>
+
+  <!-- 通关结算弹窗 -->
+  <view class="modal-mask" wx:if="{{showWinModal}}">
+    <view class="card win-card-modal">
+      <view class="win-modal-header">
+        <view class="modal-title color-amber">★ 太 棒 啦 ！★</view>
+        <view class="stars-row">⭐⭐⭐</view>
+        <view class="win-summary">{{winSummary || '顺利掌握本关汉字！'}}</view>
+      </view>
+
+      <view class="win-review-box">
+        <view class="win-review-title">🌟 本关掌握汉字（点击复听朗读）</view>
+        <scroll-view scroll-y="true" class="win-words-scroll-wrapper">
+          <view class="win-words-gallery">
+            <view 
+              wx:for="{{winWords}}" 
+              wx:key="*this" 
+              class="win-word-chip" 
+              bindtap="playWordVoice" 
+              data-word="{{item}}"
+            >{{item}}</view>
+          </view>
+        </scroll-view>
+      </view>
+
+      <view class="win-modal-footer">
+        <view class="btn-main btn-continue-huge" bindtap="nextLevel">▶ 继 续（进入下一关）</view>
+        <view class="win-actions-row">
+          <view class="btn-sub bg-amber" bindtap="retryLevel">🔄 再玩一次</view>
+          <view class="btn-sub bg-brown" bindtap="quitToMenu">🏠 返回主页</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 我的识字画册弹窗 -->
+  <view class="modal-mask" wx:if="{{showBookModal}}">
+    <view class="card book-card-container">
+      <view class="modal-title color-orange">📖 我的识字画册</view>
+      <view class="book-counter">已掌握: {{bookMasteredCount}} / 300 字</view>
+
+      <!-- 画册等级切换 -->
+      <view class="grade-btn-group book-grade-group">
+        <view 
+          wx:for="{{[1, 2, 3, 4, 5]}}" 
+          wx:key="*this" 
+          class="btn-grade {{bookGrade === item ? 'active' : ''}}"
+          bindtap="switchBookGrade"
+          data-grade="{{item}}"
+        >第{{item}}级</view>
+      </view>
+
+      <!-- 汉字卡片网格滚动区 -->
+      <scroll-view scroll-y class="book-grid">
+        <view 
+          wx:for="{{bookWordsList}}" 
+          wx:key="char" 
+          class="book-char-card {{item.isMastered ? 'mastered' : 'unmastered'}}"
+          bindtap="playWordVoice"
+          data-word="{{item.char}}"
+        >
+          <view class="book-badge" wx:if="{{item.isMastered}}">✓</view>
+          <view class="book-pinyin">{{item.pinyin}}</view>
+          <view class="book-char">{{item.char}}</view>
+          <view class="book-phrase">{{item.phrase}}</view>
+        </view>
+      </scroll-view>
+
+      <view class="btn-close" bindtap="closeBookModal">关 闭</view>
+    </view>
+  </view>
+
+  <!-- 小怪兽图鉴弹窗 -->
+  <view class="modal-mask" wx:if="{{showMonsterModal}}">
+    <view class="card">
+      <view class="modal-title color-amber">🏆 弹弹小怪兽图鉴</view>
+      <view class="modal-subtitle">已收集: {{unlockedMonsterCount}} / {{monsterList.length}}</view>
+
+      <view class="monster-grid">
+        <view 
+          wx:for="{{monsterList}}" 
+          wx:key="id" 
+          class="monster-card {{item.unlocked ? '' : 'locked'}}"
+          bindtap="playMonsterSound"
+          data-unlocked="{{item.unlocked}}"
+        >
+          <view class="monster-icon">{{item.icon}}</view>
+          <view class="monster-name">{{item.name}}</view>
+          <view class="monster-desc">{{item.unlocked ? '已解锁' : item.desc}}</view>
+        </view>
+      </view>
+
+      <view class="btn-close" bindtap="closeMonsterModal">关 闭</view>
+    </view>
+  </view>
+
+  <!-- 家长门禁算术验证弹窗 -->
+  <view class="modal-mask" wx:if="{{showGateModal}}">
+    <view class="card">
+      <view class="modal-title color-blue">👨‍👩‍👦 家长防误触验证</view>
+      <view class="modal-subtitle">请计算以下算式以进入家长模式：</view>
+      <view class="gate-question">{{gateQuestionText}}</view>
+
+      <view class="gate-opts">
+        <view 
+          wx:for="{{gateOptions}}" 
+          wx:key="*this" 
+          class="btn-gate-opt"
+          bindtap="handleGateAnswer"
+          data-val="{{item}}"
+        >{{item}}</view>
+      </view>
+
+      <view class="btn-close" bindtap="closeGateModal">返 回</view>
+    </view>
+  </view>
+
+  <!-- 家长数据看板弹窗 -->
+  <view class="modal-mask" wx:if="{{showParentModal}}">
+    <view class="card parent-card-container">
+      <view class="modal-title color-blue">📊 识字学习与艾宾浩斯复习中心</view>
+
+      <view class="parent-retention-box">
+        <view class="parent-retention-rate">艾宾浩斯记忆留存率: {{retentionRate}}%</view>
+        <view class="parent-retention-tip">
+          系统根据艾宾浩斯遗忘曲线自动在后续关卡混入已学汉字（间隔 N-1, N-2, N-5, N-7），击错汉字权重提升 2.5 倍强化复习！
+        </view>
+      </view>
+
+      <view class="parent-summary-text">累计消除练习: {{totalPracticeHits}} 次 | 已掌握汉字: {{masteredWordsCount}} 个</view>
+
+      <scroll-view scroll-y class="stats-table-scroll">
+        <view class="stats-table">
+          <view class="stats-tr stats-th">
+            <view class="stats-td">汉字</view>
+            <view class="stats-td">拼音</view>
+            <view class="stats-td">曝光</view>
+            <view class="stats-td">正确</view>
+            <view class="stats-td">易错</view>
+            <view class="stats-td">掌握度</view>
+          </view>
+          <view class="stats-tr" wx:for="{{parentStatsList}}" wx:key="char">
+            <view class="stats-td bold">{{item.char}}</view>
+            <view class="stats-td color-amber bold">{{item.pinyin}}</view>
+            <view class="stats-td">{{item.exposures}}</view>
+            <view class="stats-td color-green">{{item.hits}}</view>
+            <view class="stats-td color-red">{{item.misses}}</view>
+            <view class="stats-td bold">{{item.rate}}%</view>
+          </view>
+        </view>
+      </scroll-view>
+
+      <view class="btn-close" bindtap="closeParentModal">完成退出</view>
+    </view>
+  </view>
+</view>
