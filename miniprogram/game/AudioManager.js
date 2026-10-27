@@ -4,8 +4,8 @@ const { getWordPhrase } = require('../data/vocab');
 const FISH_AUDIO_CONFIG = {
   modelUrl: 'https://fish.audio/zh-CN/app/m/25aca46726ab4e65a626c2bbdce46c91/',
   referenceId: '25aca46726ab4e65a626c2bbdce46c91',
-  apiKey: 'sk-fish-uNXaaAp2zM8bwSDr-X30zucEj-AYP-rEzLUpq-uZHEU',
-  endpoint: 'https://api.fish.audio/v1/tts',
+  apiKey: '',
+  endpoint: '',
   model: 's2.1-pro-free'
 };
 
@@ -141,7 +141,7 @@ class AudioManager {
   }
 
   fetchFishAudioFile(text, callback) {
-    if (!text || typeof wx === 'undefined' || !wx.request) {
+    if (!text || !FISH_AUDIO_CONFIG.apiKey || !FISH_AUDIO_CONFIG.endpoint || typeof wx === 'undefined' || !wx.request) {
       callback(null);
       return;
     }

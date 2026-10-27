@@ -12,7 +12,7 @@ import urllib.error
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 FISH_API_URL = "https://api.fish.audio/v1/tts"
-FISH_API_KEY = "sk-fish-uNXaaAp2zM8bwSDr-X30zucEj-AYP-rEzLUpq-uZHEU"
+FISH_API_KEY = os.getenv("FISH_API_KEY", "")
 FISH_REFERENCE_ID = "25aca46726ab4e65a626c2bbdce46c91"
 FISH_MODEL = "s2.1-pro-free"
 

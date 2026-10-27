@@ -4,8 +4,8 @@ import { audioDB } from '../utils/AudioDB';
 export const FISH_AUDIO_CONFIG = {
   modelUrl: 'https://fish.audio/zh-CN/app/m/25aca46726ab4e65a626c2bbdce46c91/',
   referenceId: '25aca46726ab4e65a626c2bbdce46c91',
-  apiKey: 'sk-fish-uNXaaAp2zM8bwSDr-X30zucEj-AYP-rEzLUpq-uZHEU',
-  endpoint: 'https://api.fish.audio/v1/tts',
+  apiKey: '',
+  endpoint: '',
   proxyEndpoint: '/api/fish-tts',
   model: 's2.1-pro-free'
 };
@@ -211,8 +211,8 @@ export class AudioManager {
         } catch (e) {}
       }
 
-      // 3. 熔断判定
-      if (Date.now() < this.fishCooldownUntil) {
+      // 3. 若未配置 API Key 或处于熔断期，则不请求云端，完全使用本地静态音频
+      if (!FISH_AUDIO_CONFIG.apiKey || Date.now() < this.fishCooldownUntil) {
         return null;
       }
 
