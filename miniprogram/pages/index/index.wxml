@@ -19,6 +19,7 @@
     >
       <view class="hud-bar-left">
         <view class="hud-pill badge-level">第 {{currentLevel + 1}} 关</view>
+        <view class="hud-pill badge-timer {{remainingSeconds <= 30 ? 'urgent' : ''}}">⏳ {{timerText}}</view>
         <view class="hud-pill badge-score">⭐ {{score}}</view>
       </view>
       <view class="hud-bar-right">
@@ -46,10 +47,9 @@
       </view>
     </view>
 
-    <!-- 连击提示浮层 (位于任务栏下方，自动避开目标) -->
+    <!-- 连击提示浮层 (移至左下角弹弓底座旁，彻底杜绝遮挡顶部球体文字) -->
     <view 
       class="combo-badge" 
-      style="top: {{comboTop}}px;" 
       wx:if="{{combo > 1}}"
     >🔥 连击 x{{combo}}!</view>
   </view>
@@ -67,12 +67,12 @@
     <view class="title-logo">★ 弹弹识字 ★</view>
     <view class="title-subtitle">动动小手弹一弹，快乐认字每一天</view>
 
-    <!-- 等级选择卡片 -->
+    <!-- 等级与时间选择卡片 -->
     <view class="grade-pill-box">
-      <view class="grade-label">📚 选择识字等级（艾宾浩斯记忆体系 · 共5级300字）</view>
+      <view class="grade-label">📚 选择识字等级（艾宾浩斯记忆体系 · 共6级累计390核心字+拓展字）</view>
       <view class="grade-btn-group">
         <view 
-          wx:for="{{[1, 2, 3, 4, 5]}}" 
+          wx:for="{{[1, 2, 3, 4, 5, 6]}}" 
           wx:key="*this" 
           class="btn-grade {{currentGrade === item ? 'active' : ''}}"
           bindtap="selectGrade"
@@ -80,6 +80,56 @@
         >第 {{item}} 级</view>
       </view>
       <view class="grade-tip-text">{{gradeTips[currentGrade]}}</view>
+
+      <!-- 每次进入游玩时间选择 (3 / 5 / 8 分钟) -->
+      <view class="time-select-row">
+        <text class="time-select-label">⏱️ 每次游玩时间:</text>
+        <view class="time-btn-group">
+          <view 
+            wx:for="{{[3, 5, 8]}}" 
+            wx:key="*this" 
+            class="btn-time-opt {{sessionMinutes === item ? 'active' : ''}}"
+            bindtap="selectSessionTime"
+            data-mins="{{item}}"
+          >{{item}} 分钟</view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 关卡进阶路线卡片（通关上一关自动解锁下一关，其他为待解锁） -->
+    <view class="level-pill-box">
+      <view class="level-box-header">
+        <view class="level-header-left">
+          <text class="level-box-title">🎯 关卡进阶路线</text>
+          <text class="level-box-subtitle">上一关通过解锁下一关 · 第 {{currentGrade}} 级</text>
+        </view>
+        <view class="level-header-right">
+          <text class="level-progress-badge">已通关: {{passedLevelCount}}/{{levelList.length}} 关</text>
+        </view>
+      </view>
+
+      <scroll-view scroll-x="true" class="level-scroll-row" enable-flex="true">
+        <view 
+          wx:for="{{levelList}}" 
+          wx:key="index"
+          class="level-card-item {{item.unlocked ? (item.passed ? 'level-passed' : 'level-active') : 'level-locked'}} {{item.isCurrent ? 'is-current' : ''}}"
+          bindtap="selectLevel"
+          data-index="{{item.index}}"
+        >
+          <view class="level-card-name">{{item.name}}</view>
+          <view class="level-card-status" wx:if="{{item.passed}}">
+            <text class="status-star">{{item.starText || '⭐⭐⭐'}}</text>
+            <text class="status-text passed-text">已通关</text>
+          </view>
+          <view class="level-card-status" wx:elif="{{item.unlocked}}">
+            <text class="status-text active-text">🔥 可挑战</text>
+          </view>
+          <view class="level-card-status" wx:else>
+            <text class="lock-icon">🔒</text>
+            <text class="status-text locked-text">待解锁</text>
+          </view>
+        </view>
+      </scroll-view>
     </view>
 
     <!-- 开始按钮 -->
@@ -172,12 +222,12 @@
   <view class="modal-mask" wx:if="{{showBookModal}}">
     <view class="card book-card-container">
       <view class="modal-title color-orange">📖 我的识字画册</view>
-      <view class="book-counter">已掌握: {{bookMasteredCount}} / 300 字</view>
+      <view class="book-counter">{{bookCounterText}}</view>
 
       <!-- 画册等级切换 -->
       <view class="grade-btn-group book-grade-group">
         <view 
-          wx:for="{{[1, 2, 3, 4, 5]}}" 
+          wx:for="{{[1, 2, 3, 4, 5, 6]}}" 
           wx:key="*this" 
           class="btn-grade {{bookGrade === item ? 'active' : ''}}"
           bindtap="switchBookGrade"
@@ -195,6 +245,7 @@
           data-word="{{item.char}}"
         >
           <view class="book-badge" wx:if="{{item.isMastered}}">✓</view>
+          <view class="book-ext-tag" wx:if="{{item.isExt}}">拓</view>
           <view class="book-pinyin">{{item.pinyin}}</view>
           <view class="book-char">{{item.char}}</view>
           <view class="book-phrase">{{item.phrase}}</view>
@@ -247,6 +298,44 @@
       </view>
 
       <view class="btn-close" bindtap="closeGateModal">返 回</view>
+    </view>
+  </view>
+
+  <!-- 时间截止 · 家长防沉迷解锁弹窗 -->
+  <view class="modal-mask" wx:if="{{showTimeLockModal}}">
+    <view class="card">
+      <view class="modal-icon">⏰👀</view>
+      <view class="modal-title color-red">游玩时间到啦！</view>
+      <view class="modal-subtitle">
+        小眼睛已经连续学习满设定时长啦，先看看远方休息一下吧！如需继续游玩，请由家长选择时长并完成算术解锁：
+      </view>
+
+      <view class="time-select-row" style="margin: 12rpx 0;">
+        <text class="time-select-label">解锁时长:</text>
+        <view class="time-btn-group">
+          <view 
+            wx:for="{{[3, 5, 8]}}" 
+            wx:key="*this" 
+            class="btn-time-opt {{pendingUnlockMins === item ? 'active' : ''}}"
+            bindtap="selectUnlockMins"
+            data-mins="{{item}}"
+          >{{item}} 分钟</view>
+        </view>
+      </view>
+
+      <view class="gate-question">{{lockGateQuestionText}}</view>
+
+      <view class="gate-opts">
+        <view 
+          wx:for="{{lockGateOptions}}" 
+          wx:key="*this" 
+          class="btn-gate-opt"
+          bindtap="handleLockGateAnswer"
+          data-val="{{item}}"
+        >{{item}}</view>
+      </view>
+
+      <view class="btn-close" bindtap="closeTimeLockToHome">🏠 返回首页休息</view>
     </view>
   </view>
 

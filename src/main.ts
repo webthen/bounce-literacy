@@ -3,12 +3,16 @@ import { PlayScene } from './scenes/PlayScene';
 import { AudioManager } from './game/AudioManager';
 import { StorageManager } from './utils/Storage';
 import { MONSTER_LIST } from './data/monsters';
-import { getWordPinyin, getWordPhrase, VOCAB_TIERS } from './data/vocab';
+import { getWordPinyin, getWordPhrase, isExtWord, VOCAB_TIERS } from './data/vocab';
+import { EbbinghausEngine } from './game/EbbinghausEngine';
 
 class App {
   private app: PIXI.Application;
   private playScene: PlayScene | null = null;
   private isPlaying: boolean = false;
+  private isPausedByModal: boolean = false;
+  private sessionTimerId: any = null;
+  private pendingUnlockMins: number = 5;
 
   constructor() {
     const isPortrait = window.innerHeight > window.innerWidth;
@@ -31,11 +35,20 @@ class App {
       wrapper.appendChild(this.app.view as HTMLCanvasElement);
     }
 
+    this.pendingUnlockMins = StorageManager.instance.data.sessionMinutes || 5;
     this.setupUI();
     this.setupTicker();
     this.checkOrientation();
     window.addEventListener('resize', () => this.checkOrientation());
     window.addEventListener('orientationchange', () => this.checkOrientation());
+
+    // 预热全局核心 Fish Audio 语音，确保首次发音零延迟
+    AudioManager.instance.prefetchLevel([]);
+
+    // 若上次已是时间截止锁定状态，进入页面即提示家长解锁
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.openTimeLockModal();
+    }
   }
 
   private isRotated: boolean = false;
@@ -46,8 +59,6 @@ class App {
     document.body.classList.toggle('is-portrait', isPortrait);
     document.body.classList.toggle('is-landscape', !isPortrait);
 
-    // 动态调整 Pixi.js 渲染器逻辑分辨率
-    // 竖屏时动态匹配屏幕宽高比，保证 ScaleX === ScaleY，100% 杜绝小球与文字纵向拉伸变成椭圆
     const screenW = window.innerWidth || 360;
     const screenH = window.innerHeight || 640;
     const targetW = isPortrait ? 720 : 1280;
@@ -60,7 +71,6 @@ class App {
       this.playScene.setOrientation(isPortrait, targetW, targetH);
     }
 
-    // 若用户物理旋转至横屏，自动退出网页内强制旋转，恢复完美原生全屏横屏
     if (!isPortrait && this.isRotated) {
       this.toggleInPageRotation();
     }
@@ -84,7 +94,6 @@ class App {
       (this.app.renderer.events as any).mapPositionToPoint = (point: PIXI.Point, x2: number, y2: number) => {
         const canvas = this.app.view as HTMLCanvasElement;
         const rect = canvas.getBoundingClientRect();
-        // 90度顺时针旋转坐标转换映射：触控垂直映射游戏X轴，触控水平映射游戏Y轴
         point.x = ((y2 - rect.top) / (rect.height || 1)) * 1280;
         point.y = ((rect.right - x2) / (rect.width || 1)) * 720;
       };
@@ -98,7 +107,7 @@ class App {
   private setupTicker() {
     this.app.ticker.add((delta) => {
       const dt = delta / 60;
-      if (this.isPlaying && this.playScene) {
+      if (this.isPlaying && !this.isPausedByModal && !StorageManager.instance.data.isTimeLocked && this.playScene) {
         this.playScene.update(dt);
       }
     });
@@ -108,7 +117,7 @@ class App {
     const startScreen = document.getElementById('start-screen');
     const hud = document.getElementById('game-hud');
 
-    // 识字等级切换 (第 1 级 ~ 第 5 级)
+    // 识字等级切换 (第 1 级 ~ 第 6 级)
     this.updateGradeButtons();
     const setupGradeBtnList = (containerId: string) => {
       const container = document.getElementById(containerId);
@@ -120,16 +129,72 @@ class App {
           const grade = parseInt(btn.getAttribute('data-grade') || '1');
           StorageManager.instance.setGrade(grade);
           this.updateGradeButtons();
+          this.updateLevelList(grade);
         };
       });
     };
     setupGradeBtnList('grade-btn-group');
     setupGradeBtnList('parent-grade-btn-group');
+    this.updateLevelList(StorageManager.instance.data.currentGrade || 1);
+
+    // 游玩时间选择 (3 / 5 / 8 分钟)
+    this.updateTimeButtons();
+    const startTimeBtns = document.querySelectorAll('#time-btn-group .btn-time-opt');
+    startTimeBtns.forEach(btn => {
+      (btn as HTMLElement).onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        if (StorageManager.instance.data.isTimeLocked) {
+          this.openTimeLockModal();
+          return;
+        }
+        const mins = parseInt(btn.getAttribute('data-mins') || '5');
+        this.pendingUnlockMins = mins;
+        StorageManager.instance.setSessionMinutes(mins, true);
+        this.updateTimeButtons();
+        this.updateTimerBadgeUI();
+      };
+    });
+
+    const lockTimeBtns = document.querySelectorAll('#lock-time-btn-group .btn-time-opt');
+    lockTimeBtns.forEach(btn => {
+      (btn as HTMLElement).onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        const mins = parseInt(btn.getAttribute('data-mins') || '5');
+        this.pendingUnlockMins = mins;
+        this.updateTimeButtons();
+      };
+    });
+
+    const btnLockBackHome = document.getElementById('btn-lock-back-home');
+    if (btnLockBackHome) {
+      btnLockBackHome.onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        document.getElementById('time-lock-modal')?.classList.remove('show');
+        if (this.isPlaying) {
+          this.quitToTitle();
+        }
+      };
+    }
 
     // 开始游戏
     document.getElementById('btn-start-game')!.onclick = () => {
       AudioManager.instance.unlock();
       AudioManager.instance.playSFX('sfx_click');
+      if (StorageManager.instance.data.isTimeLocked) {
+        this.openTimeLockModal();
+        return;
+      }
+      const grade = StorageManager.instance.data.currentGrade || 1;
+      const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
+      const maxUnlocked = StorageManager.instance.getMaxUnlockedLevel(grade, total);
+      let curL = StorageManager.instance.data.currentLevel || 0;
+      if (!StorageManager.instance.isLevelUnlocked(grade, curL)) {
+        curL = maxUnlocked;
+        StorageManager.instance.data.currentLevel = curL;
+      }
+      // 每次从首页点击进入游戏，按所选的 3 / 5 / 8 分钟开启本局倒计时
+      const mins = StorageManager.instance.data.sessionMinutes || 5;
+      StorageManager.instance.setSessionMinutes(mins, true);
       startScreen!.classList.add('hidden');
       hud!.style.display = 'flex';
       this.startGame();
@@ -139,19 +204,23 @@ class App {
     const pauseModal = document.getElementById('pause-modal')!;
     document.getElementById('pause-btn')!.onclick = () => {
       AudioManager.instance.playSFX('sfx_click');
+      this.isPausedByModal = true;
       pauseModal.classList.add('show');
     };
     document.getElementById('btn-resume')!.onclick = () => {
       AudioManager.instance.playSFX('sfx_click');
+      this.isPausedByModal = false;
       pauseModal.classList.remove('show');
     };
     document.getElementById('btn-restart-level')!.onclick = () => {
       AudioManager.instance.playSFX('sfx_click');
+      this.isPausedByModal = false;
       pauseModal.classList.remove('show');
       if (this.playScene) this.playScene.retryLevel();
     };
     document.getElementById('btn-quit-to-menu')!.onclick = () => {
       AudioManager.instance.playSFX('sfx_click');
+      this.isPausedByModal = false;
       pauseModal.classList.remove('show');
       this.quitToTitle();
     };
@@ -159,10 +228,20 @@ class App {
     // 通关结算面板
     const winModal = document.getElementById('win-modal')!;
     document.getElementById('modal-next-btn')!.onclick = () => {
+      if (StorageManager.instance.data.isTimeLocked) {
+        winModal.classList.remove('show');
+        this.openTimeLockModal();
+        return;
+      }
       winModal.classList.remove('show');
       if (this.playScene) this.playScene.nextLevel();
     };
     document.getElementById('modal-retry-btn')!.onclick = () => {
+      if (StorageManager.instance.data.isTimeLocked) {
+        winModal.classList.remove('show');
+        this.openTimeLockModal();
+        return;
+      }
       winModal.classList.remove('show');
       if (this.playScene) this.playScene.retryLevel();
     };
@@ -222,7 +301,7 @@ class App {
       parentModal.classList.remove('show');
     };
 
-    // 声音开关 (简洁图标按钮)
+    // 声音开关
     const soundBtn = document.getElementById('sound-btn');
     if (soundBtn) {
       soundBtn.onclick = () => {
@@ -245,7 +324,7 @@ class App {
       };
     }
 
-    // 网页内横屏/竖屏自由切换（无需配置手机系统横屏，即开即玩）
+    // 网页内横屏/竖屏自由切换
     const rotateBtns = document.querySelectorAll('.btn-rotate-toggle');
     rotateBtns.forEach(btn => {
       (btn as HTMLElement).onclick = () => {
@@ -253,6 +332,121 @@ class App {
         this.toggleInPageRotation();
       };
     });
+  }
+
+  private updateTimeButtons() {
+    const curMins = StorageManager.instance.data.sessionMinutes || 5;
+    document.querySelectorAll('#time-btn-group .btn-time-opt').forEach(el => {
+      const m = parseInt(el.getAttribute('data-mins') || '5');
+      el.classList.toggle('active', m === curMins);
+    });
+    document.querySelectorAll('#lock-time-btn-group .btn-time-opt').forEach(el => {
+      const m = parseInt(el.getAttribute('data-mins') || '5');
+      el.classList.toggle('active', m === this.pendingUnlockMins);
+    });
+  }
+
+  private formatRemainingTime(sec: number): string {
+    const s = Math.max(0, Math.floor(sec));
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  }
+
+  private updateTimerBadgeUI() {
+    const badge = document.getElementById('timer-badge');
+    if (!badge) return;
+    const rem = StorageManager.instance.data.remainingSeconds;
+    badge.innerText = `⏳ ${this.formatRemainingTime(rem)}`;
+    badge.classList.toggle('urgent', rem <= 30);
+  }
+
+  private startSessionTimer() {
+    this.stopSessionTimer();
+    this.updateTimerBadgeUI();
+    this.sessionTimerId = setInterval(() => {
+      if (!this.isPlaying || this.isPausedByModal) return;
+      if (StorageManager.instance.data.isTimeLocked) {
+        this.handleTimeUp();
+        return;
+      }
+
+      StorageManager.instance.data.remainingSeconds = Math.max(0, (StorageManager.instance.data.remainingSeconds || 0) - 1);
+      StorageManager.instance.save();
+      this.updateTimerBadgeUI();
+
+      if (StorageManager.instance.data.remainingSeconds <= 0) {
+        this.handleTimeUp();
+      }
+    }, 1000);
+  }
+
+  private stopSessionTimer() {
+    if (this.sessionTimerId) {
+      clearInterval(this.sessionTimerId);
+      this.sessionTimerId = null;
+    }
+  }
+
+  private handleTimeUp() {
+    StorageManager.instance.lockByTimeUp();
+    this.stopSessionTimer();
+    AudioManager.instance.stopVoice();
+    this.isPausedByModal = true;
+    document.getElementById('intro-modal')?.classList.remove('show');
+    document.getElementById('pause-modal')?.classList.remove('show');
+    document.getElementById('win-modal')?.classList.remove('show');
+    this.openTimeLockModal();
+  }
+
+  private openTimeLockModal() {
+    this.pendingUnlockMins = StorageManager.instance.data.sessionMinutes || 5;
+    this.updateTimeButtons();
+
+    const numWords = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    const a = Math.floor(Math.random() * 6) + 3;
+    const b = Math.floor(Math.random() * 6) + 3;
+    const ans = a * b;
+    const qEl = document.getElementById('lock-gate-question');
+    if (qEl) {
+      qEl.innerText = `${numWords[a]} 乘以 ${numWords[b]} 等于几？`;
+    }
+
+    const opts = new Set([ans]);
+    while (opts.size < 4) {
+      const candidate = ans + Math.floor(Math.random() * 13) - 6;
+      if (candidate > 0) opts.add(candidate);
+    }
+    const arr = Array.from(opts).sort(() => Math.random() - 0.5);
+
+    const optContainer = document.getElementById('lock-gate-options');
+    if (optContainer) {
+      optContainer.innerHTML = '';
+      arr.forEach(val => {
+        const btn = document.createElement('button');
+        btn.className = 'btn-gate-opt';
+        btn.innerText = String(val);
+        btn.onclick = () => {
+          if (val === ans) {
+            AudioManager.instance.playSFX('sfx_bumper');
+            StorageManager.instance.unlockByParent(this.pendingUnlockMins);
+            this.updateTimeButtons();
+            this.updateTimerBadgeUI();
+            document.getElementById('time-lock-modal')?.classList.remove('show');
+            this.isPausedByModal = false;
+            if (this.isPlaying) {
+              this.startSessionTimer();
+            }
+          } else {
+            AudioManager.instance.playSFX('sfx_mismatch');
+            this.openTimeLockModal();
+          }
+        };
+        optContainer.appendChild(btn);
+      });
+    }
+
+    document.getElementById('time-lock-modal')?.classList.add('show');
   }
 
   private startGame() {
@@ -266,14 +460,18 @@ class App {
     const targetW = isPortrait ? 720 : 1280;
     const targetH = isPortrait ? Math.round(720 * (screenH / screenW)) : 720;
 
+    this.isPausedByModal = false;
     this.playScene = new PlayScene(this.app, () => this.quitToTitle(), isPortrait, targetW, targetH);
     this.app.stage.addChild(this.playScene);
     this.isPlaying = true;
+    this.startSessionTimer();
   }
 
   private quitToTitle() {
     this.isPlaying = false;
-    AudioManager.instance.stopSpeech();
+    this.isPausedByModal = false;
+    this.stopSessionTimer();
+    AudioManager.instance.stopVoice();
     if (this.playScene) {
       this.app.stage.removeChild(this.playScene);
       this.playScene.destroy({ children: true });
@@ -283,6 +481,84 @@ class App {
     if (introModal) introModal.classList.remove('show');
     document.getElementById('game-hud')!.style.display = 'none';
     document.getElementById('start-screen')!.classList.remove('hidden');
+    this.updateLevelList(StorageManager.instance.data.currentGrade || 1);
+  }
+
+  private updateLevelList(grade: number) {
+    const scrollRow = document.getElementById('level-scroll-row');
+    if (!scrollRow) return;
+    scrollRow.innerHTML = '';
+
+    const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
+    const passedCount = StorageManager.instance.getPassedLevelCount(grade, total);
+    const maxUnlocked = StorageManager.instance.getMaxUnlockedLevel(grade, total);
+
+    let curL = StorageManager.instance.data.currentLevel ?? 0;
+    if (!StorageManager.instance.isLevelUnlocked(grade, curL)) {
+      curL = maxUnlocked;
+      StorageManager.instance.data.currentLevel = curL;
+    }
+
+    const subEl = document.getElementById('level-box-subtitle');
+    if (subEl) {
+      subEl.innerText = `上一关通过解锁下一关 · 第 ${grade} 级`;
+    }
+    const badgeEl = document.getElementById('level-progress-badge');
+    if (badgeEl) {
+      badgeEl.innerText = `已通关: ${passedCount}/${total} 关`;
+    }
+
+    const startScreen = document.getElementById('start-screen');
+    const hud = document.getElementById('game-hud');
+
+    for (let i = 0; i < total; i++) {
+      const isPassed = StorageManager.instance.isLevelPassed(grade, i);
+      const isUnlocked = StorageManager.instance.isLevelUnlocked(grade, i);
+      const isCur = (i === curL);
+
+      const item = document.createElement('div');
+      item.className = `level-card-item ${isUnlocked ? (isPassed ? 'level-passed' : 'level-active') : 'level-locked'} ${isCur ? 'is-current' : ''}`;
+
+      const starText = isPassed ? (StorageManager.instance.data.starsPerLevel[`${grade}_${i}`] === 3 ? '⭐⭐⭐' : '⭐') : '';
+
+      item.innerHTML = `
+        <div class="level-card-name">第 ${i + 1} 关</div>
+        ${isPassed 
+          ? `<div class="level-card-status"><span class="status-star" style="font-size:10px;">${starText}</span><span class="status-text" style="font-size:10px; font-weight:bold; color:#2E7D32;">已通关</span></div>`
+          : (isUnlocked 
+              ? `<div class="level-card-status"><span class="status-text active-text" style="font-size:11px; font-weight:800; color:#FF6F00;">🔥 可挑战</span></div>`
+              : `<div class="level-card-status"><span style="font-size:12px;">🔒</span><span class="locked-text" style="font-size:10px; color:#78909C;">待解锁</span></div>`
+            )
+        }
+      `;
+
+      item.onclick = () => {
+        if (!isUnlocked) {
+          AudioManager.instance.playSFX('sfx_mismatch');
+          alert(`🔒 请先通过上一关才能解锁第 ${i + 1} 关！`);
+          return;
+        }
+        AudioManager.instance.playSFX('sfx_click');
+        if (StorageManager.instance.data.isTimeLocked) {
+          this.openTimeLockModal();
+          return;
+        }
+        StorageManager.instance.data.currentLevel = i;
+        StorageManager.instance.save();
+        this.updateLevelList(grade);
+
+        // 点击可挑战关卡直接开启本关
+        const mins = StorageManager.instance.data.sessionMinutes || 5;
+        StorageManager.instance.setSessionMinutes(mins, true);
+        if (startScreen && hud) {
+          startScreen.classList.add('hidden');
+          hud.style.display = 'flex';
+          this.startGame();
+        }
+      };
+
+      scrollRow.appendChild(item);
+    }
   }
 
   private renderMonsters() {
@@ -334,11 +610,13 @@ class App {
 
       const py = getWordPinyin(ch);
       const ph = getWordPhrase(ch);
+      const extFlag = isExtWord(grade, ch);
 
       const card = document.createElement('div');
       card.className = `book-card ${isMastered ? 'mastered' : 'unmastered'}`;
       card.innerHTML = `
         ${isMastered ? `<div class="book-badge">✓</div>` : ''}
+        ${extFlag ? `<div style="position:absolute;top:-5px;left:-5px;background:#7E57C2;color:#FFF;font-size:10px;padding:1px 5px;border-radius:8px;font-weight:bold;">拓</div>` : ''}
         <div class="book-pinyin">${py}</div>
         <div class="book-char">${ch}</div>
         <div class="book-phrase">${ph}</div>
@@ -351,7 +629,8 @@ class App {
 
     const counter = document.getElementById('book-counter');
     if (counter) {
-      counter.innerText = `已掌握: ${totalMastered} / 300 字 · 本级掌握: ${gradeMastered} / ${tier.words.length} (${tier.title})`;
+      const extDesc = tier.extWords.length > 0 ? `+拓展${tier.extWords.length}字` : '';
+      counter.innerText = `已掌握: ${totalMastered} 字 · 本级掌握: ${gradeMastered} / ${tier.words.length} (核心${tier.coreWords.length}字${extDesc} · 累计核心${tier.cumulativeCore}字)`;
     }
   }
 
@@ -378,6 +657,11 @@ class App {
         if (val === ans) {
           AudioManager.instance.playSFX('sfx_bumper');
           document.getElementById('gate-modal')!.classList.remove('show');
+          // 家长验证通过后若处于时间截止锁屏也一并解锁
+          if (StorageManager.instance.data.isTimeLocked) {
+            StorageManager.instance.unlockByParent();
+            this.updateTimerBadgeUI();
+          }
           this.openParentDashboard();
         } else {
           AudioManager.instance.playSFX('sfx_mismatch');
@@ -397,11 +681,12 @@ class App {
     });
 
     const tips: Record<number, string> = {
-      1: "第 1 级 · 启蒙基础 (数词、自然天地、身体动作与亲人)",
-      2: "第 2 级 · 探索世界 (代词、四季气候、常见动物与生活色彩)",
-      3: "第 3 级 · 认知表达 (家庭成员、身体部位、疑问词与特征反义词)",
-      4: "第 4 级 · 逻辑空间 (方位定向、动作指令、身体感受与逻辑连接)",
-      5: "第 5 级 · 丰富表达 (量词度量、五味感官、形态细节与事理法则)"
+      1: "第 1 级 · 启蒙基础（核心60字 + 拓展28字 · 累计核心：60字）",
+      2: "第 2 级 · 探索世界（核心60字 + 拓展30字 · 累计核心：120字）",
+      3: "第 3 级 · 认知表达（核心60字 + 拓展32字 · 累计核心：180字）",
+      4: "第 4 级 · 逻辑空间（核心60字 + 拓展40字 · 累计核心：240字）",
+      5: "第 5 级 · 丰富表达（核心70字 + 拓展34字 · 累计核心：310字）",
+      6: "第 6 级 · 读写进阶（核心80字 · 累计核心：390字）"
     };
     const tipEl = document.getElementById('grade-tip-text');
     if (tipEl) {
@@ -444,7 +729,6 @@ class App {
   }
 }
 
-// 页面加载完成后启动
 window.addEventListener('DOMContentLoaded', () => {
   new App();
 });

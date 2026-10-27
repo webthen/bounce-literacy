@@ -8,7 +8,7 @@ import { ParticleSystem } from '../game/ParticleSystem';
 import { AudioManager } from '../game/AudioManager';
 import { StorageManager } from '../utils/Storage';
 import { EbbinghausEngine, DynamicLevelDef } from '../game/EbbinghausEngine';
-import { VOCAB_LIST, getWordPinyin, getWordPhrase } from '../data/vocab';
+import { getWordPinyin, getWordPhrase } from '../data/vocab';
 
 export class PlayScene extends PIXI.Container {
   private app: PIXI.Application;
@@ -41,9 +41,9 @@ export class PlayScene extends PIXI.Container {
   public viewHeight: number = 720;
 
   // 动力学减速调优参数 (专为 4~6 岁儿童视力与追踪能力调校)
-  private readonly LAUNCH_IMPULSE_RATIO: number = 5.2; // 适中灵敏度
-  private readonly MAX_SPEED: number = 520;           // 全场速度硬顶上限 520 px/s
-  private readonly MIN_SPEED: number = 280;           // 最小基础发射速度 280 px/s
+  private readonly LAUNCH_IMPULSE_RATIO: number = 5.2;
+  private readonly MAX_SPEED: number = 520;
+  private readonly MIN_SPEED: number = 280;
   private screenShakeStrength: number = 0;
 
   constructor(app: PIXI.Application, onQuitToTitle: () => void, isPortrait: boolean = false, viewW?: number, viewH?: number) {
@@ -60,7 +60,8 @@ export class PlayScene extends PIXI.Container {
 
     this.slingshot = new Slingshot();
     const anchorX = this.viewWidth / 2;
-    const anchorY = isPortrait ? (this.viewHeight - 160) : 580;
+    // 弹弓底座上移，预留充足底部防误触区域，避免手指在底边滑动时触发系统手势
+    const anchorY = isPortrait ? (this.viewHeight - 240) : 560;
     this.slingshot.setAnchor(anchorX, anchorY);
     this.addChild(this.slingshot);
 
@@ -83,35 +84,54 @@ export class PlayScene extends PIXI.Container {
 
     this.drawBackground();
     const anchorX = this.viewWidth / 2;
-    const anchorY = isPortrait ? (this.viewHeight - 160) : 580;
+    const anchorY = isPortrait ? (this.viewHeight - 240) : 560;
     this.slingshot.setAnchor(anchorX, anchorY);
     this.hitArea = new PIXI.Rectangle(0, 0, this.viewWidth, this.viewHeight);
 
-    this.startLevel(this.currentLevelIdx, this.currentGrade);
+    this.startLevel(this.currentLevelIdx, this.currentGrade, true);
+  }
+
+  /**
+   * 动态计算顶部 HUD 在 Canvas 坐标系下的安全底边 Y 值，杜绝任何顶部文字遮挡球体
+   */
+  private getTopSafeCeilingY(): number {
+    let minSafe = this.isPortrait ? 148 : 108;
+    try {
+      const wrapper = document.getElementById('game-wrapper');
+      const hud = document.getElementById('game-hud');
+      if (wrapper && hud && hud.style.display !== 'none') {
+        const wRect = wrapper.getBoundingClientRect();
+        const hRect = hud.getBoundingClientRect();
+        if (wRect.height > 0 && hRect.height > 0) {
+          const hudBottomCss = hRect.bottom - wRect.top;
+          const canvasHudBottom = (hudBottomCss / wRect.height) * this.viewHeight;
+          minSafe = Math.max(minSafe, Math.round(canvasHudBottom + 18));
+        }
+      }
+    } catch (e) {}
+    return minSafe;
   }
 
   private drawBackground() {
     this.bgGfx.clear();
-    // 温暖鹅黄奶白底色
     this.bgGfx.beginFill(0xFFF9E6);
     this.bgGfx.drawRect(0, 0, this.viewWidth, this.viewHeight);
     this.bgGfx.endFill();
 
-    // 浮动云朵装饰 (自适应横屏/竖屏)
     this.bgGfx.beginFill(0xFFFFFF, 0.45);
     if (this.isPortrait) {
-      this.bgGfx.drawCircle(110, 110, 45);
-      this.bgGfx.drawCircle(150, 100, 58);
-      this.bgGfx.drawCircle(190, 110, 38);
+      this.bgGfx.drawCircle(110, 140, 45);
+      this.bgGfx.drawCircle(150, 130, 58);
+      this.bgGfx.drawCircle(190, 140, 38);
 
       const rightCloudX = this.viewWidth - 150;
-      this.bgGfx.drawCircle(rightCloudX - 40, 130, 45);
-      this.bgGfx.drawCircle(rightCloudX, 120, 58);
-      this.bgGfx.drawCircle(rightCloudX + 40, 130, 38);
+      this.bgGfx.drawCircle(rightCloudX - 40, 160, 45);
+      this.bgGfx.drawCircle(rightCloudX, 150, 58);
+      this.bgGfx.drawCircle(rightCloudX + 40, 160, 38);
     } else {
-      this.bgGfx.drawCircle(180, 140, 50);
-      this.bgGfx.drawCircle(230, 130, 65);
-      this.bgGfx.drawCircle(280, 140, 45);
+      this.bgGfx.drawCircle(180, 150, 50);
+      this.bgGfx.drawCircle(230, 140, 65);
+      this.bgGfx.drawCircle(280, 150, 45);
 
       this.bgGfx.drawCircle(1040, 180, 50);
       this.bgGfx.drawCircle(1090, 170, 65);
@@ -119,8 +139,7 @@ export class PlayScene extends PIXI.Container {
     }
     this.bgGfx.endFill();
 
-    // 底部发射基线
-    const baselineY = this.isPortrait ? (this.viewHeight - 240) : 520;
+    const baselineY = this.isPortrait ? (this.viewHeight - 320) : 500;
     this.bgGfx.lineStyle(3, 0xE0D6C3, 1);
     for (let x = 30; x < this.viewWidth - 30; x += 24) {
       this.bgGfx.moveTo(x, baselineY);
@@ -134,13 +153,25 @@ export class PlayScene extends PIXI.Container {
     } else {
       this.currentGrade = StorageManager.instance.data.currentGrade || 1;
     }
+
+    const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.currentGrade);
+    // 关卡锁定检查：若未解锁则自动回退至已解锁的最大关卡
+    if (!StorageManager.instance.isLevelUnlocked(this.currentGrade, idx)) {
+      idx = StorageManager.instance.getMaxUnlockedLevel(this.currentGrade, totalInGrade);
+    }
+
     this.currentLevelIdx = idx;
     this.curConfig = EbbinghausEngine.generateLevel(this.currentGrade, this.currentLevelIdx, this.isPortrait);
     this.remainingTargets = new Set(this.curConfig.targetWords);
     this.ballQueue = [...this.curConfig.ballSequence];
+
+    // 关卡全量 Fish Audio 语音后台静默预热（从内存/IndexedDB/云端预取，保障零网络延迟发音）
+    AudioManager.instance.prefetchLevel(this.curConfig.targetWords);
+
     this.combo = 0;
     this.missCount = 0;
     this.activeWeakHint = false;
+    this.isCelebrationActive = false;
 
     this.targetBlocks.forEach(b => this.removeChild(b));
     this.obstacles.forEach(o => this.removeChild(o));
@@ -156,12 +187,25 @@ export class PlayScene extends PIXI.Container {
     }
 
     const centerX = this.viewWidth / 2;
-    // 往下平移珠子整体阵列 (centerY 从 360 移至 415，竖屏从 0.42 移至 0.48)，确保顶部留出充足安全边距，绝不被“第几关”“得分”HUD栏遮盖
-    const centerY = this.isPortrait ? Math.round(this.viewHeight * 0.48) : 415;
+    const topSafeY = this.getTopSafeCeilingY();
+    const baselineY = this.isPortrait ? (this.viewHeight - 320) : 500;
+    const defaultCenterY = this.isPortrait ? Math.round((topSafeY + baselineY) * 0.54) : 410;
+
+    // 整体计算阵列上下边界，若最顶部的球靠近顶部 HUD，则整组下移，绝不挤压行距且绝不遮挡文字
+    let minTopEdge = Infinity;
+    for (const b of this.curConfig.blocks) {
+      const py = defaultCenterY - b.y;
+      const halfH = ((b.height && b.height > 84) ? b.height : 104) / 2;
+      if (py - halfH < minTopEdge) {
+        minTopEdge = py - halfH;
+      }
+    }
+    const requiredTopEdge = topSafeY + 22;
+    const shiftDown = minTopEdge < requiredTopEdge ? (requiredTopEdge - minTopEdge) : 0;
 
     for (const b of this.curConfig.blocks) {
       const px = centerX + b.x;
-      const py = centerY - b.y;
+      const py = defaultCenterY - b.y + shiftDown;
 
       if (b.type === 'TARGET') {
         const tb = new TargetBlock(b.id, b.word || '', (b.width && b.width > 84) ? b.width : 104, (b.height && b.height > 84) ? b.height : 104, b.isReview);
@@ -217,24 +261,23 @@ export class PlayScene extends PIXI.Container {
         startBtn.onclick = () => {
           introModal.classList.remove('show');
           AudioManager.instance.stopVoice();
-          // 顺承播放：vo_ready 念完后再播报找字引导，彻底解决同时出声
+          this.spawnNextBall(false);
+          // 严格串行：vo_ready 播放完毕后才进入找字语音引导
           AudioManager.instance.playVoice('vo_ready', () => {
             this.promptNextBall();
           });
-          this.spawnNextBall(false);
         };
       }
-      setTimeout(() => {
-        if (this.curConfig.targetWords.length > 0) {
-          AudioManager.instance.playVoice('vo_intro');
-        }
-      }, 350);
+      AudioManager.instance.stopVoice();
+      if (this.curConfig.targetWords.length > 0) {
+        AudioManager.instance.playVoice('vo_intro');
+      }
     } else {
       AudioManager.instance.stopVoice();
+      this.spawnNextBall(false);
       AudioManager.instance.playVoice('vo_ready', () => {
         this.promptNextBall();
       });
-      this.spawnNextBall(false);
     }
   }
 
@@ -260,32 +303,24 @@ export class PlayScene extends PIXI.Container {
   }
 
   private spawnNextBall(shouldPrompt: boolean = true) {
-    // 1. 获取场上当前实际存活的目标汉字列表 (绝对权威数据源)
     const activeWords = Array.from(new Set(this.targetBlocks.filter(b => !b.eliminated).map(b => b.word)));
     if (activeWords.length === 0) {
       return;
     }
 
-    // 2. 实时同步 remainingTargets，保证集合绝对准确
     this.remainingTargets = new Set(activeWords);
-
-    // 3. 过滤掉队列中所有已消除的死词，杜绝“对不上”
     this.ballQueue = this.ballQueue.filter(w => this.remainingTargets.has(w));
 
-    // 4. 弹珠打完到最后时的动态补给逻辑：
     if (this.ballQueue.length === 0) {
       if (activeWords.length === 1) {
-        // 场上仅剩最后 1 个目标字：恒定供给该字，保证最后绝不卡关且 100% 对齐
         this.ballQueue = [activeWords[0], activeWords[0]];
       } else {
-        // 场上剩余多个目标字：生成打乱序列，每词 2 颗，循环保底
         const refill = [...activeWords, ...activeWords].sort(() => Math.random() - 0.5);
         this.ballQueue = refill;
       }
     }
 
     let word = this.ballQueue.shift();
-    // 5. 终极安全校验：若取出的 word 不在场上，强行从 activeWords 中选取
     if (!word || !this.remainingTargets.has(word)) {
       word = activeWords[Math.floor(Math.random() * activeWords.length)];
     }
@@ -302,14 +337,9 @@ export class PlayScene extends PIXI.Container {
     this.addChild(this.currentBall.getTrailGfx());
     this.addChild(this.currentBall);
 
-    // 同步更新识字任务栏并在允许时进行语音引导
     this.updateMissionHUD(word);
     if (shouldPrompt && !this.isCelebrationActive) {
-      setTimeout(() => {
-        if (!this.isCelebrationActive) {
-          AudioManager.instance.playMissionPrompt(word);
-        }
-      }, 150);
+      AudioManager.instance.playMissionPrompt(word);
     }
   }
 
@@ -327,7 +357,8 @@ export class PlayScene extends PIXI.Container {
       if (dist < 150 || (pos.y > (this.slingshot.anchorY - 100) && Math.abs(pos.x - this.slingshot.anchorX) < 160)) {
         this.slingshot.isDragging = true;
         this.updateBallDrag(pos.x, pos.y);
-        AudioManager.instance.playWord(this.currentBall.word);
+        // 若当前已有引导语音正在播放，则不重复叠加单字语音
+        AudioManager.instance.playWord(this.currentBall.word, undefined, true);
       }
     };
 
@@ -347,7 +378,6 @@ export class PlayScene extends PIXI.Container {
       const dist = Math.hypot(dx, dy);
 
       if (dist > 18) {
-        // 计算平缓而适中的速度 (px/s)
         let initialSpeed = dist * this.LAUNCH_IMPULSE_RATIO;
         initialSpeed = Math.max(this.MIN_SPEED, Math.min(this.MAX_SPEED, initialSpeed));
 
@@ -370,15 +400,12 @@ export class PlayScene extends PIXI.Container {
     this.on('pointerupoutside', onPointerUp);
   }
 
-  /** 限制小球拖动范围：只能向后/下拉，且绝对不能超出画框边界 */
   private updateBallDrag(pointerX: number, pointerY: number) {
     if (!this.currentBall) return;
 
-    // 1. 获取光标相对基准点的偏移量：仅允许向下拉 (dy >= 0)，防止向上推导致反向误发射
     const rawDx = pointerX - this.slingshot.anchorX;
     const rawDy = Math.max(0, pointerY - this.slingshot.anchorY);
 
-    // 2. 距离硬顶限制在 maxDrag 以内
     const dist = Math.hypot(rawDx, rawDy);
     let targetX = this.slingshot.anchorX;
     let targetY = this.slingshot.anchorY;
@@ -389,11 +416,10 @@ export class PlayScene extends PIXI.Container {
       targetY = this.slingshot.anchorY + (rawDy / dist) * clampedDist;
     }
 
-    // 3. 画框安全边界绝对约束 (保证球体整体完全在画框内，且留出安全边距)
     const minX = this.currentBall.r + 20;
     const maxX = this.viewWidth - this.currentBall.r - 20;
     const minY = this.slingshot.anchorY;
-    const maxY = this.viewHeight - this.currentBall.r - 12;
+    const maxY = this.viewHeight - (this.isPortrait ? 100 : 40);
 
     this.slingshot.dragX = Math.max(minX, Math.min(maxX, targetX));
     this.slingshot.dragY = Math.max(minY, Math.min(maxY, targetY));
@@ -426,7 +452,6 @@ export class PlayScene extends PIXI.Container {
     if (this.currentBall && this.currentBall.state === 'FLYING') {
       const ball = this.currentBall;
 
-      // 限速保护：确保无论怎么反弹碰撞，小球速度都不超过舒适可读阈值
       const curSpd = Math.hypot(ball.vx, ball.vy);
       if (curSpd > this.MAX_SPEED) {
         const factor = this.MAX_SPEED / curSpd;
@@ -434,14 +459,12 @@ export class PlayScene extends PIXI.Container {
         ball.vy *= factor;
       }
 
-      // 精确时间步进 (px/s 乘以 dt 秒)
       ball.x += ball.vx * dt;
       ball.y += ball.vy * dt;
       ball.updatePhysicsEffects();
 
       const baselineY = this.isPortrait ? (this.viewHeight - 240) : 520;
 
-      // 边框碰撞：侧壁反弹仅在虚线发射基线以上有效，虚线以下绝不左右来回弹跳
       if (ball.y <= baselineY) {
         if (ball.x - ball.r < 20) {
           ball.x = 20 + ball.r;
@@ -456,22 +479,20 @@ export class PlayScene extends PIXI.Container {
         }
       }
 
-      // 顶部边界反弹 (在 HUD 下方安全反弹)
-      const topBounceY = this.isPortrait ? 88 : 80;
+      // 顶部边界反弹 (严格在 HUD 安全底边之下反弹，绝不钻入顶部文字后方)
+      const topBounceY = this.getTopSafeCeilingY();
       if (ball.y - ball.r < topBounceY) {
         ball.y = topBounceY + ball.r;
         ball.vy = Math.abs(ball.vy);
         ball.bounces++;
         AudioManager.instance.playSFX('sfx_bounce');
       } else if (ball.y > baselineY && ball.vy > 0) {
-        // 小球下落越过虚线即视为未击中脱离游戏区，立即利落回收，绝不在虚线下耽搁时间
         const word = ball.word;
         this.recycleBall();
         this.onMiss(word);
         return;
       }
 
-      // 超级弹力轮 (Bumper) 反弹（温和提速至固定舒适速度，绝不飞速失控）
       for (const bmp of this.bumpers) {
         const dist = Math.hypot(ball.x - bmp.x, ball.y - bmp.y);
         if (dist < ball.r + bmp.r) {
@@ -481,7 +502,6 @@ export class PlayScene extends PIXI.Container {
           ball.vx = ball.vx - 2 * dot * nx;
           ball.vy = ball.vy - 2 * dot * ny;
 
-          // 保持在 460 px/s 左右的活泼节奏
           const boostSpd = Math.min(this.MAX_SPEED, Math.max(450, Math.hypot(ball.vx, ball.vy) * 1.05));
           const norm = Math.hypot(ball.vx, ball.vy) || 1;
           ball.vx = (ball.vx / norm) * boostSpd;
@@ -497,7 +517,6 @@ export class PlayScene extends PIXI.Container {
         }
       }
 
-      // 普通障碍碰撞
       for (const obs of this.obstacles) {
         const nearX = Math.max(obs.x - obs.w / 2, Math.min(ball.x, obs.x + obs.w / 2));
         const nearY = Math.max(obs.y - obs.h / 2, Math.min(ball.y, obs.y + obs.h / 2));
@@ -518,7 +537,6 @@ export class PlayScene extends PIXI.Container {
         }
       }
 
-      // 汉字玻璃珠目标碰撞 (双球弹性碰撞)
       for (let i = this.targetBlocks.length - 1; i >= 0; i--) {
         const tb = this.targetBlocks[i];
         if (tb.eliminated) continue;
@@ -541,15 +559,12 @@ export class PlayScene extends PIXI.Container {
             this.removeChild(tb);
             this.targetBlocks.splice(i, 1);
 
-            // 检查场上是否还有相同汉字的目标块
             const hasMoreOfSameWord = this.targetBlocks.some(b => !b.eliminated && b.word === tb.word);
             if (!hasMoreOfSameWord) {
               this.remainingTargets.delete(tb.word);
-              // 立即过滤发射队列中已经消除的字，杜绝弹珠与场上存活目标对不上
               this.ballQueue = this.ballQueue.filter(w => this.remainingTargets.has(w));
             }
 
-            StorageManager.instance.recordHit(tb.word, this.currentLevelIdx + 1);
             this.particleSys.burst(tb.x, tb.y, 0xFFD700, 35);
             this.screenShakeStrength = 7;
             this.onHitSuccess(tb.word, ball.bounces);
@@ -562,9 +577,8 @@ export class PlayScene extends PIXI.Container {
             StorageManager.instance.recordMiss(tb.word);
             AudioManager.instance.playSFX('sfx_mismatch');
 
-            // 防频繁冲突与防轰炸节流：命中庆祝期间严格禁言；1.4秒内至多播报一次撞错提示
             const now = Date.now();
-            if (!this.isCelebrationActive && now - this.lastWrongVoiceTime > 1400) {
+            if (!this.isCelebrationActive && !AudioManager.instance.isSpeaking && now - this.lastWrongVoiceTime > 1500) {
               this.lastWrongVoiceTime = now;
               AudioManager.instance.playWrongWord(tb.word);
             }
@@ -572,7 +586,6 @@ export class PlayScene extends PIXI.Container {
         }
       }
 
-      // 16秒无操作/低速软回收保护
       if (Date.now() - ball.launchTime > 16000) {
         const w = ball.word;
         this.recycleBall();
@@ -595,7 +608,6 @@ export class PlayScene extends PIXI.Container {
     this.combo++;
     this.isCelebrationActive = true;
 
-    // 一发即中 / 识字神射手判定：反弹 <= 1 次即精准击中对应汉字
     const isDirectHit = bounces <= 1;
     const isSuperHit = bounces >= 3;
     const directHitBonus = isDirectHit ? 50 : 0;
@@ -605,31 +617,44 @@ export class PlayScene extends PIXI.Container {
 
     StorageManager.instance.recordHit(word, this.currentGrade, this.currentLevelIdx);
 
-    // 立即停止一切在途语音，播放命中音效
+    // 停止此前未播完的引导语音，进入命中专属串行语音流
     AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_match');
 
-    // 顺承播放：先标准念读词组（“山！大山！”），念完后再触发赞美语音（“太棒了！”），绝无任何声音打架
-    AudioManager.instance.playWordWithPhrase(word, () => {
-      if (isDirectHit || isSuperHit) {
-        AudioManager.instance.playVoice('vo_super');
-      }
-    });
-
     this.showBigWordPopup(word, addPts, isDirectHit);
 
+    // 视觉上 950ms 后收起大字弹窗并提前生成待命弹珠，避免连续命中时遮挡视野
     setTimeout(() => {
       this.hideBigWordPopup();
+      if (this.remainingTargets.size > 0 && !this.currentBall) {
+        this.spawnNextBall(false);
+      }
+    }, 950);
+
+    // 语音严格串行：念读词组完毕 -> (若神射手则播放赞美语音) -> 完毕后才播报下一颗球引导或通关语音
+    const onAllHitVoicesDone = () => {
       this.isCelebrationActive = false;
       if (this.remainingTargets.size === 0) {
         this.handleLevelWin();
       } else {
-        this.spawnNextBall(true);
+        if (!this.currentBall) {
+          this.spawnNextBall(true);
+        } else {
+          this.promptNextBall();
+        }
       }
-    }, 1800);
+    };
+
+    AudioManager.instance.playWordWithPhrase(word, () => {
+      if (isDirectHit || isSuperHit) {
+        AudioManager.instance.playVoice('vo_super', onAllHitVoicesDone);
+      } else {
+        onAllHitVoicesDone();
+      }
+    });
   }
 
-  private onMiss(word: string) {
+  private onMiss(_word: string) {
     this.missCount++;
     this.combo = 0;
     this.updateHUD();
@@ -637,7 +662,7 @@ export class PlayScene extends PIXI.Container {
     if (this.missCount >= 2) {
       this.activeWeakHint = true;
     }
-    setTimeout(() => this.spawnNextBall(), 400);
+    setTimeout(() => this.spawnNextBall(true), 400);
   }
 
   private handleLevelWin() {
@@ -645,7 +670,7 @@ export class PlayScene extends PIXI.Container {
     AudioManager.instance.stopVoice();
     StorageManager.instance.recordLevelWin(this.currentGrade, this.currentLevelIdx, 3);
     AudioManager.instance.playSFX('sfx_win');
-    setTimeout(() => AudioManager.instance.playVoice('vo_clear'), 300);
+    AudioManager.instance.playVoice('vo_clear');
 
     confetti({
       particleCount: 120,
@@ -656,7 +681,6 @@ export class PlayScene extends PIXI.Container {
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.currentGrade);
     const isGradeComplete = (this.currentLevelIdx + 1 >= totalInGrade);
 
-    // 渲染本关识字复习成果画廊
     const gallery = document.getElementById('win-words-gallery');
     if (gallery) {
       gallery.innerHTML = '';
@@ -682,12 +706,12 @@ export class PlayScene extends PIXI.Container {
       let title = `恭喜通过第 ${this.currentGrade} 级 · 第 ${this.currentLevelIdx + 1} 关！`;
       let desc = `得分: ${this.score} | 累计识字: ${StorageManager.instance.data.totalHits} 次 (艾宾浩斯复习巩固)`;
       if (isGradeComplete) {
-        if (this.currentGrade < 5) {
+        if (this.currentGrade < 6) {
           title = `🎉 恭喜通关【第 ${this.currentGrade} 级】全部字词！`;
           desc = `下一关将解锁【第 ${this.currentGrade + 1} 级】新词汇挑战！`;
         } else {
-          title = `👑 恭喜全部 5 个等级完全通关！`;
-          desc = `已牢固掌握 300 个核心汉字！你是超级识字大宗师！`;
+          title = `👑 恭喜全部 6 个等级完全通关！`;
+          desc = `已牢固掌握全部 390 个核心汉字与拓展字！你是超级识字大宗师！`;
         }
       }
       document.getElementById('win-summary')!.innerText = title;
@@ -742,7 +766,7 @@ export class PlayScene extends PIXI.Container {
     if (comboEl) {
       if (this.combo > 1) {
         comboEl.innerText = `🔥 ${this.combo}连击!`;
-        comboEl.style.display = 'block';
+        comboEl.style.display = 'inline-flex';
       } else {
         comboEl.style.display = 'none';
       }
@@ -753,16 +777,21 @@ export class PlayScene extends PIXI.Container {
     AudioManager.instance.stopVoice();
     this.isCelebrationActive = false;
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.currentGrade);
-    if (this.currentLevelIdx + 1 < totalInGrade) {
-      this.startLevel(this.currentLevelIdx + 1, this.currentGrade);
+    const nextIdx = this.currentLevelIdx + 1;
+    if (nextIdx < totalInGrade) {
+      if (!StorageManager.instance.isLevelUnlocked(this.currentGrade, nextIdx)) {
+        alert('🔒 下一关尚未解锁，请先通过上一关！');
+        return;
+      }
+      this.startLevel(nextIdx, this.currentGrade);
     } else {
-      if (this.currentGrade < 5) {
+      if (this.currentGrade < 6) {
         const nextG = this.currentGrade + 1;
         alert(`🎉 太棒了！已顺利通关第 ${this.currentGrade} 级！即将进入【第 ${nextG} 级】新词汇挑战！`);
         StorageManager.instance.setGrade(nextG);
         this.startLevel(0, nextG);
       } else {
-        alert('👑 终极大满贯！你已经成功通关了全部 5 个等级共 300 个汉字！艾宾浩斯记忆大师！');
+        alert('👑 终极大满贯！你已经成功通关了全部 6 个等级共 390 个核心汉字！艾宾浩斯记忆大师！');
         this.onQuitToTitle();
       }
     }

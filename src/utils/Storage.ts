@@ -8,8 +8,11 @@ export interface WordStatItem {
 
 export interface UserSaveData {
   totalHits: number;
-  currentGrade: number; // 当前选中的等级 1 ~ 5
+  currentGrade: number; // 当前选中的等级 1 ~ 6
   currentLevel: number; // 当前等级的关卡索引
+  sessionMinutes: number; // 每次进入游玩时长：3 / 5 / 8 分钟
+  remainingSeconds: number; // 当前剩余游玩秒数
+  isTimeLocked: boolean; // 时间截止是否处于家长锁屏状态
   unlockedMonsters: string[];
   starsPerLevel: Record<string, number>; // key: `${grade}_${level}`
   stats: Record<string, WordStatItem>;
@@ -28,6 +31,9 @@ export class StorageManager {
     totalHits: 0,
     currentGrade: 1,
     currentLevel: 0,
+    sessionMinutes: 5,
+    remainingSeconds: 300,
+    isTimeLocked: false,
     unlockedMonsters: ['m_mushroom'],
     starsPerLevel: {},
     stats: {}
@@ -46,9 +52,13 @@ export class StorageManager {
         console.warn('Failed to parse user save data', e);
       }
     }
-    // 兼容老版本存储
     if (!this.data.currentGrade) this.data.currentGrade = 1;
     if (this.data.currentLevel === undefined) this.data.currentLevel = 0;
+    if (![3, 5, 8].includes(this.data.sessionMinutes)) this.data.sessionMinutes = 5;
+    if (typeof this.data.isTimeLocked !== 'boolean') this.data.isTimeLocked = false;
+    if (typeof this.data.remainingSeconds !== 'number' || this.data.remainingSeconds < 0) {
+      this.data.remainingSeconds = this.data.sessionMinutes * 60;
+    }
   }
 
   public save() {
@@ -61,7 +71,31 @@ export class StorageManager {
     this.save();
   }
 
-  public recordHit(word: string, grade: number, level: number) {
+  public setSessionMinutes(mins: number, resetRemaining: boolean = true) {
+    const valid = [3, 5, 8].includes(mins) ? mins : 5;
+    this.data.sessionMinutes = valid;
+    if (resetRemaining && !this.data.isTimeLocked) {
+      this.data.remainingSeconds = valid * 60;
+    }
+    this.save();
+  }
+
+  public lockByTimeUp() {
+    this.data.isTimeLocked = true;
+    this.data.remainingSeconds = 0;
+    this.save();
+  }
+
+  public unlockByParent(mins?: number) {
+    if (mins && [3, 5, 8].includes(mins)) {
+      this.data.sessionMinutes = mins;
+    }
+    this.data.isTimeLocked = false;
+    this.data.remainingSeconds = this.data.sessionMinutes * 60;
+    this.save();
+  }
+
+  public recordHit(word: string, grade: number, level: number = 0) {
     this.data.totalHits++;
     if (!this.data.stats[word]) {
       this.data.stats[word] = { hits: 0, misses: 0, exposures: 0 };
@@ -92,6 +126,45 @@ export class StorageManager {
     this.data.currentLevel = levelId + 1;
     this.checkUnlocks(grade, levelId);
     this.save();
+  }
+
+  /**
+   * 判定指定关卡是否已通关 (有获得星星记录)
+   */
+  public isLevelPassed(grade: number, levelIdx: number): boolean {
+    const key = `${grade}_${levelIdx}`;
+    return (this.data.starsPerLevel[key] || 0) > 0;
+  }
+
+  /**
+   * 判定指定关卡是否已解锁（上一关通过了才能进入下一关，第1关默认解锁）
+   */
+  public isLevelUnlocked(grade: number, levelIdx: number): boolean {
+    if (levelIdx <= 0) return true;
+    return this.isLevelPassed(grade, levelIdx - 1);
+  }
+
+  /**
+   * 获取指定等级下当前可挑战的最大关卡索引
+   */
+  public getMaxUnlockedLevel(grade: number, totalLevels: number = 30): number {
+    for (let l = 0; l < totalLevels; l++) {
+      if (!this.isLevelUnlocked(grade, l)) {
+        return Math.max(0, l - 1);
+      }
+    }
+    return totalLevels - 1;
+  }
+
+  /**
+   * 获取指定等级下已通过的关卡数量
+   */
+  public getPassedLevelCount(grade: number, totalLevels: number = 30): number {
+    let count = 0;
+    for (let l = 0; l < totalLevels; l++) {
+      if (this.isLevelPassed(grade, l)) count++;
+    }
+    return count;
   }
 
   private checkUnlocks(curGrade: number, curLevel: number) {

@@ -1,5 +1,5 @@
 // miniprogram/game/EbbinghausEngine.js
-const { VOCAB_TIERS, getWordPinyin } = require('../data/vocab');
+const { VOCAB_TIERS } = require('../data/vocab');
 const { StorageManager } = require('../utils/Storage');
 
 class EbbinghausEngine {
@@ -16,7 +16,7 @@ class EbbinghausEngine {
 
   /**
    * 动态生成符合艾宾浩斯记忆曲线的关卡配置
-   * @param grade 等级 (1 ~ 5)
+   * @param grade 等级 (1 ~ 6)
    * @param levelIndex 关卡索引 (0-indexed)
    */
   static generateLevel(grade, levelIndex, isPortrait = true) {
@@ -24,11 +24,10 @@ class EbbinghausEngine {
     const totalLevels = this.getTotalLevelsInGrade(grade);
     const safeIdx = Math.max(0, Math.min(totalLevels - 1, levelIndex));
 
-    // 1. 获取本关全新学习的汉字 (3 ~ 4 个)
     const startIdx = safeIdx * this.WORDS_PER_LEVEL;
     const newWords = tier.words.slice(startIdx, startIdx + this.WORDS_PER_LEVEL);
+    const isExtSection = startIdx >= tier.coreWords.length;
 
-    // 2. 根据艾宾浩斯遗忘曲线挑选复习汉字 (2 ~ 3 个)
     const reviewWords = [];
     if (safeIdx > 0) {
       const learnedWords = tier.words.slice(0, startIdx);
@@ -65,12 +64,12 @@ class EbbinghausEngine {
     const ballSequence = [...targetWords, ...targetWords].sort(() => Math.random() - 0.5);
 
     const blocks = [];
-    const layoutPositions = isPortrait 
+    const layoutPositions = isPortrait
       ? this.generatePortraitLayout(targetWords.length)
       : this.generateNonOverlappingLayout(targetWords.length);
 
     targetWords.forEach((word, idx) => {
-      const pos = layoutPositions[idx] || { x: 0, y: 300 };
+      const pos = layoutPositions[idx] || { x: 0, y: 180 };
       const isReviewWord = reviewWords.includes(word);
       blocks.push({
         id: `t_${idx}_${word}`,
@@ -92,9 +91,9 @@ class EbbinghausEngine {
             id: 'bmp_center',
             type: 'BUMPER',
             x: 0,
-            y: -100,
-            width: 70,
-            height: 70,
+            y: -120,
+            width: 68,
+            height: 68,
             shape: 'CIRCLE'
           });
         } else {
@@ -102,7 +101,7 @@ class EbbinghausEngine {
             id: 'bmp_left',
             type: 'BUMPER',
             x: -160,
-            y: -90,
+            y: -110,
             width: 64,
             height: 64,
             shape: 'CIRCLE'
@@ -111,7 +110,7 @@ class EbbinghausEngine {
             id: 'bmp_right',
             type: 'BUMPER',
             x: 160,
-            y: -90,
+            y: -110,
             width: 64,
             height: 64,
             shape: 'CIRCLE'
@@ -123,9 +122,9 @@ class EbbinghausEngine {
             id: 'bmp_center',
             type: 'BUMPER',
             x: 0,
-            y: -20,
-            width: 70,
-            height: 70,
+            y: -45,
+            width: 68,
+            height: 68,
             shape: 'CIRCLE'
           });
         } else {
@@ -133,25 +132,26 @@ class EbbinghausEngine {
             id: 'bmp_left',
             type: 'BUMPER',
             x: -320,
-            y: 40,
-            width: 68,
-            height: 68,
+            y: 15,
+            width: 66,
+            height: 66,
             shape: 'CIRCLE'
           });
           blocks.push({
             id: 'bmp_right',
             type: 'BUMPER',
             x: 320,
-            y: 40,
-            width: 68,
-            height: 68,
+            y: 15,
+            width: 66,
+            height: 66,
             shape: 'CIRCLE'
           });
         }
       }
     }
 
-    const title = `${tier.title} · 第 ${safeIdx + 1} 课${reviewWords.length > 0 ? ` (新学+复习)` : ' (新课启航)'}`;
+    const sectionTag = isExtSection ? '拓展巩固' : (reviewWords.length > 0 ? '核心+复习' : '核心新课');
+    const title = `${tier.title} · 第 ${safeIdx + 1} 课 (${sectionTag})`;
 
     return {
       grade,
@@ -169,42 +169,42 @@ class EbbinghausEngine {
     const positions = [];
     if (count <= 4) {
       const xs = [-125, 125];
-      const ys = [220, 80];
+      const ys = [190, 55];
       for (const y of ys) {
         for (const x of xs) {
           if (positions.length < count) positions.push({ x, y });
         }
       }
     } else if (count === 5) {
-      positions.push({ x: -180, y: 230 });
-      positions.push({ x: 0, y: 245 });
-      positions.push({ x: 180, y: 230 });
-      positions.push({ x: -100, y: 90 });
-      positions.push({ x: 100, y: 90 });
+      positions.push({ x: -180, y: 200 });
+      positions.push({ x: 0, y: 212 });
+      positions.push({ x: 180, y: 200 });
+      positions.push({ x: -105, y: 65 });
+      positions.push({ x: 105, y: 65 });
     } else if (count === 6) {
-      positions.push({ x: -120, y: 240 });
-      positions.push({ x: 120, y: 240 });
-      positions.push({ x: -170, y: 130 });
-      positions.push({ x: 170, y: 130 });
-      positions.push({ x: -120, y: 20 });
-      positions.push({ x: 120, y: 20 });
+      positions.push({ x: -120, y: 210 });
+      positions.push({ x: 120, y: 210 });
+      positions.push({ x: -170, y: 95 });
+      positions.push({ x: 170, y: 95 });
+      positions.push({ x: -120, y: -15 });
+      positions.push({ x: 120, y: -15 });
     } else if (count === 7) {
-      positions.push({ x: -120, y: 245 });
-      positions.push({ x: 120, y: 245 });
-      positions.push({ x: -190, y: 140 });
-      positions.push({ x: 0, y: 150 });
-      positions.push({ x: 190, y: 140 });
-      positions.push({ x: -120, y: 35 });
-      positions.push({ x: 120, y: 35 });
+      positions.push({ x: -125, y: 215 });
+      positions.push({ x: 125, y: 215 });
+      positions.push({ x: -190, y: 100 });
+      positions.push({ x: 0, y: 108 });
+      positions.push({ x: 190, y: 100 });
+      positions.push({ x: -125, y: -12 });
+      positions.push({ x: 125, y: -12 });
     } else {
-      positions.push({ x: -180, y: 250 });
-      positions.push({ x: 0, y: 265 });
-      positions.push({ x: 180, y: 250 });
-      positions.push({ x: -110, y: 150 });
-      positions.push({ x: 110, y: 150 });
-      positions.push({ x: -180, y: 40 });
-      positions.push({ x: 0, y: 50 });
-      positions.push({ x: 180, y: 40 });
+      positions.push({ x: -180, y: 220 });
+      positions.push({ x: 0, y: 230 });
+      positions.push({ x: 180, y: 220 });
+      positions.push({ x: -110, y: 105 });
+      positions.push({ x: 110, y: 105 });
+      positions.push({ x: -180, y: -10 });
+      positions.push({ x: 0, y: 0 });
+      positions.push({ x: 180, y: -10 });
     }
     return positions;
   }
@@ -216,7 +216,7 @@ class EbbinghausEngine {
       const startX = -((count - 1) * spacing) / 2;
       for (let i = 0; i < count; i++) {
         const x = startX + i * spacing;
-        const archY = 120 - Math.abs(x) * 0.12;
+        const archY = 95 - Math.abs(x) * 0.10;
         positions.push({ x, y: archY });
       }
     } else if (count <= 6) {
@@ -226,11 +226,11 @@ class EbbinghausEngine {
       const btmSpacing = 220;
       const topStartX = -((topCount - 1) * topSpacing) / 2;
       for (let i = 0; i < topCount; i++) {
-        positions.push({ x: topStartX + i * topSpacing, y: 160 });
+        positions.push({ x: topStartX + i * topSpacing, y: 130 });
       }
       const btmStartX = -((btmCount - 1) * btmSpacing) / 2;
       for (let i = 0; i < btmCount; i++) {
-        positions.push({ x: btmStartX + i * btmSpacing, y: 30 });
+        positions.push({ x: btmStartX + i * btmSpacing, y: 5 });
       }
     } else {
       const topCount = 4;
@@ -239,11 +239,11 @@ class EbbinghausEngine {
       const btmSpacing = 200;
       const topStartX = -((topCount - 1) * topSpacing) / 2;
       for (let i = 0; i < topCount; i++) {
-        positions.push({ x: topStartX + i * topSpacing, y: 175 });
+        positions.push({ x: topStartX + i * topSpacing, y: 138 });
       }
       const btmStartX = -((btmCount - 1) * btmSpacing) / 2;
       for (let i = 0; i < btmCount; i++) {
-        positions.push({ x: btmStartX + i * btmSpacing, y: 35 });
+        positions.push({ x: btmStartX + i * btmSpacing, y: 8 });
       }
     }
     return positions;

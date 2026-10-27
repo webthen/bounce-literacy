@@ -168,13 +168,14 @@ export class TargetBlock extends PIXI.Container {
   }
 
   /**
-   * 展示头顶注音/提示气泡
+   * 展示头顶/底部注音/提示气泡（若球体靠近顶部则朝下弹出，绝不被顶部 HUD 遮挡）
    */
   public showSpeechBubble(text: string, duration: number = 1.4) {
     this.bubbleText.text = text;
     const paddingX = 14;
     const tw = Math.max(68, this.bubbleText.width + paddingX * 2);
     const th = 28;
+    const showBelow = this.y < 210;
 
     this.bubbleBg.clear();
     // 阴影
@@ -185,13 +186,19 @@ export class TargetBlock extends PIXI.Container {
     this.bubbleBg.beginFill(0xFFFFFF, 0.98);
     this.bubbleBg.lineStyle(2, 0x00BCD4, 1);
     this.bubbleBg.drawRoundedRect(-tw / 2, -th / 2, tw, th, 14);
-    // 底部小三角指引
-    this.bubbleBg.moveTo(-5, th / 2);
-    this.bubbleBg.lineTo(0, th / 2 + 5);
-    this.bubbleBg.lineTo(5, th / 2);
+    // 小三角指引
+    if (showBelow) {
+      this.bubbleBg.moveTo(-5, -th / 2);
+      this.bubbleBg.lineTo(0, -th / 2 - 5);
+      this.bubbleBg.lineTo(5, -th / 2);
+    } else {
+      this.bubbleBg.moveTo(-5, th / 2);
+      this.bubbleBg.lineTo(0, th / 2 + 5);
+      this.bubbleBg.lineTo(5, th / 2);
+    }
     this.bubbleBg.endFill();
 
-    this.bubbleContainer.position.set(0, -this.r - 24);
+    this.bubbleContainer.position.set(0, showBelow ? (this.r + 24) : (-this.r - 24));
     this.bubbleContainer.alpha = 1;
     this.bubbleContainer.visible = true;
     this.bubbleTime = duration;
@@ -209,7 +216,8 @@ export class TargetBlock extends PIXI.Container {
 
     if (this.bubbleTime > 0) {
       this.bubbleTime -= dt;
-      this.bubbleContainer.y -= dt * 8;
+      const dir = this.bubbleContainer.y > 0 ? 1 : -1;
+      this.bubbleContainer.y += dir * dt * 6;
       if (this.bubbleTime < 0.4) {
         this.bubbleContainer.alpha = Math.max(0, this.bubbleTime / 0.4);
       }

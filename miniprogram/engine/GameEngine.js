@@ -7,7 +7,7 @@ class GameEngine {
   constructor(canvas, ctx, page) {
     this.canvas = canvas;
     this.ctx = ctx;
-    this.page = page; // 宿主小程序 Page 实例
+    this.page = page;
 
     this.width = canvas.width;
     this.height = canvas.height;
@@ -16,47 +16,42 @@ class GameEngine {
     this.isRunning = false;
     this.animationFrameId = null;
 
-    // 物理缩放比例 (以设计宽度 720 为基准)
     this.scale = this.width / 720;
 
-    // 弹弓锚点位置 (底部中央)
     this.anchorX = this.width / 2;
-    this.anchorY = this.height - (180 * this.scale);
+    // 弹弓底座显著上移，预留充足底部防误触安全区（杜绝触发手机底部手势或半屏小程序）
+    this.anchorY = this.height - (260 * this.scale);
 
-    // 弹弓参数
-    this.slingshotPullLimit = 140 * this.scale;
+    this.slingshotPullLimit = 110 * this.scale;
     this.ballRadius = 42 * this.scale;
 
-    // 触摸拖拽状态
     this.isDragging = false;
     this.dragX = this.anchorX;
     this.dragY = this.anchorY;
 
-    // 关卡对象
     this.currentBall = null;
     this.ballQueue = [];
     this.targets = [];
     this.bumpers = [];
     this.particles = [];
 
-    // 状态
     this.score = 0;
     this.combo = 0;
     this.levelData = null;
     this.isCleared = false;
     this.hasClearedTriggered = false;
+    this.isCelebratingHit = false;
+    this.lastWrongVoiceTime = 0;
     this.nextBallTimeout = null;
-    this.hudBottom = 130;
+    this.hudBottom = 135;
 
     this.bindEvents();
   }
 
-  bindEvents() {
-    // 监听窗口尺寸或重设尺寸
-  }
+  bindEvents() {}
 
   setHudBottom(bottom) {
-    this.hudBottom = bottom || 130;
+    this.hudBottom = bottom || 135;
   }
 
   resize(w, h, dpr) {
@@ -65,45 +60,50 @@ class GameEngine {
     this.dpr = dpr || 2;
     this.scale = this.width / 720;
     this.anchorX = this.width / 2;
-    this.anchorY = this.height - (180 * this.scale);
-    this.slingshotPullLimit = 140 * this.scale;
+    this.anchorY = this.height - (260 * this.scale);
+    this.slingshotPullLimit = 110 * this.scale;
     this.ballRadius = 42 * this.scale;
   }
 
   loadLevel(levelDef) {
     this.levelData = levelDef;
     this.ballQueue = [...levelDef.ballSequence];
+    AudioManager.instance.prefetchLevel(levelDef.targetWords || []);
     this.particles = [];
     this.currentBall = null;
     this.combo = 0;
     this.isCleared = false;
     this.hasClearedTriggered = false;
+    this.isCelebratingHit = false;
     if (this.nextBallTimeout) {
       clearTimeout(this.nextBallTimeout);
       this.nextBallTimeout = null;
     }
 
-    // 解析目标方块与反弹蘑菇
     this.targets = [];
     this.bumpers = [];
 
     const cx = this.width / 2;
-    // 游戏区域垂直分布：避开顶部两层 HUD (带安全距离) 与 底部弹弓
-    const hudFloor = (this.hudBottom || 126) + (20 * this.scale);
-    const slingshotCeiling = this.anchorY - (80 * this.scale);
-    // 纵向中心基准线
-    const playCenterY = (hudFloor + slingshotCeiling) / 2;
+    // 顶部 HUD 安全底边：留足 28*scale 间距，确保任何球体及光晕绝不被顶部任务栏或连击文字遮挡
+    const hudFloor = (this.hudBottom || 135) + (28 * this.scale);
+    const slingshotCeiling = this.anchorY - (85 * this.scale);
+    const playCenterY = (hudFloor + slingshotCeiling) * 0.53;
+
+    // 整体计算阵列最高点，若超过 hudFloor 则将整个阵列整体下移，保持行距均匀不重叠
+    let minTopEdge = Infinity;
+    levelDef.blocks.forEach(b => {
+      const py = playCenterY - b.y * this.scale;
+      const r = (b.width / 2) * this.scale;
+      if (py - r < minTopEdge) {
+        minTopEdge = py - r;
+      }
+    });
+    const shiftDown = minTopEdge < hudFloor ? (hudFloor - minTopEdge) : 0;
 
     levelDef.blocks.forEach(b => {
-      // 坐标映射：以屏幕水平中心与游戏可玩纵向中心为基准
       const px = cx + b.x * this.scale;
-      let py = playCenterY - b.y * this.scale;
-
+      const py = playCenterY - b.y * this.scale + shiftDown;
       const r = (b.width / 2) * this.scale;
-      // 保证所有目标方块距离顶部 HUD 至少有 20px 安全空隙，绝对不遮挡
-      if (py - r < hudFloor) {
-        py = hudFloor + r;
-      }
 
       if (b.type === 'TARGET') {
         this.targets.push({
@@ -129,11 +129,11 @@ class GameEngine {
       }
     });
 
-    this.spawnNextBall();
+    this.spawnNextBall(true);
     this.page.updateHUD(this.score, this.combo, this.currentBall ? this.currentBall.word : '');
   }
 
-  spawnNextBall() {
+  spawnNextBall(shouldPrompt = true) {
     if (this.isCleared) return;
 
     const activeTargets = this.targets.filter(t => t.active);
@@ -142,10 +142,8 @@ class GameEngine {
       return;
     }
 
-    // 智能选球：过滤已消除的字，只发场上存活的目标球
     this.ballQueue = this.ballQueue.filter(w => activeTargets.some(t => t.word === w));
 
-    // 如果队列空了，按场上存活的目标重新填充
     if (this.ballQueue.length === 0) {
       const remainWords = activeTargets.map(t => t.word);
       this.ballQueue = [...remainWords, ...remainWords].sort(() => Math.random() - 0.5);
@@ -161,7 +159,7 @@ class GameEngine {
       vx: 0,
       vy: 0,
       r: this.ballRadius,
-      state: 'READY', // 'READY', 'FLYING', 'DEAD'
+      state: 'READY',
       bounces: 0,
       maxBounces: 5,
       trail: []
@@ -170,8 +168,9 @@ class GameEngine {
     this.dragX = this.anchorX;
     this.dragY = this.anchorY;
 
-    // 播放任务引导提示音
-    AudioManager.instance.playMissionPrompt(word);
+    if (shouldPrompt && !this.isCelebratingHit) {
+      AudioManager.instance.playMissionPrompt(word);
+    }
     this.page.updateHUD(this.score, this.combo, word);
   }
 
@@ -182,8 +181,8 @@ class GameEngine {
     const dy = y - this.anchorY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    // 在弹弓区域点击即可开始拉拽
-    if (dist < 100 * this.scale || y > this.anchorY - 60 * this.scale) {
+    // 扩大拖拽感应区，同时确保不触及屏幕最下沿
+    if (dist < 110 * this.scale || (Math.abs(dx) < 160 * this.scale && y > this.anchorY - 70 * this.scale && y < this.anchorY + 90 * this.scale)) {
       this.isDragging = true;
       this.updateDrag(x, y);
     }
@@ -195,6 +194,12 @@ class GameEngine {
   }
 
   updateDrag(x, y) {
+    // 底部绝对防误触安全距离：严格限制拖拽位置不得低于屏幕底部 85px 安全区，彻底杜绝触发半屏/全屏手势返回
+    const bottomSafeFloor = this.height - (130 * this.scale);
+    if (y > bottomSafeFloor) {
+      y = bottomSafeFloor;
+    }
+
     const dx = x - this.anchorX;
     const dy = y - this.anchorY;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -224,17 +229,16 @@ class GameEngine {
     const dy = this.anchorY - this.dragY;
     const pullDist = Math.sqrt(dx * dx + dy * dy);
 
-    if (pullDist > 25 * this.scale) {
-      // 成功发射
-      const impulseRatio = 6.8;
+    if (pullDist > 20 * this.scale) {
+      const impulseRatio = 8.6;
       this.currentBall.vx = dx * impulseRatio;
       this.currentBall.vy = dy * impulseRatio;
       this.currentBall.state = 'FLYING';
       this.currentBall.bounces = 0;
       AudioManager.instance.playSFX('sfx_shoot');
-      AudioManager.instance.playWord(this.currentBall.word);
+      // 若当前引导音尚未播完，则不打断、不叠加单字发音
+      AudioManager.instance.playWord(this.currentBall.word, null, true);
     } else {
-      // 拉伸距离过小，重置回原点
       this.currentBall.x = this.anchorX;
       this.currentBall.y = this.anchorY;
       this.dragX = this.anchorX;
@@ -271,7 +275,6 @@ class GameEngine {
   }
 
   update(dt) {
-    // 1. 更新反弹蘑菇动画
     this.bumpers.forEach(b => {
       if (b.bumpAnim > 0) {
         b.bumpAnim -= dt * 4;
@@ -279,7 +282,6 @@ class GameEngine {
       }
     });
 
-    // 2. 更新目标方块呼吸与抖动
     this.targets.forEach(t => {
       t.scaleTime += dt * 2.5;
       if (t.shakeTime > 0) {
@@ -288,12 +290,11 @@ class GameEngine {
       }
     });
 
-    // 3. 更新粒子系统
     for (let i = this.particles.length - 1; i >= 0; i--) {
       const p = this.particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vy += 300 * this.scale * dt; // 重力
+      p.vy += 300 * this.scale * dt;
       p.life -= dt;
       p.alpha = Math.max(0, p.life / p.maxLife);
       if (p.life <= 0) {
@@ -301,14 +302,11 @@ class GameEngine {
       }
     }
 
-    // 4. 更新弹球物理飞行
     const ball = this.currentBall;
     if (ball && ball.state === 'FLYING') {
-      // 记录拖尾
       ball.trail.unshift({ x: ball.x, y: ball.y });
       if (ball.trail.length > 8) ball.trail.pop();
 
-      // 微重力 + 阻力
       ball.vy += 180 * this.scale * dt;
       ball.vx *= (1 - 0.25 * dt);
       ball.vy *= (1 - 0.25 * dt);
@@ -316,11 +314,9 @@ class GameEngine {
       ball.x += ball.vx * dt;
       ball.y += ball.vy * dt;
 
-      // 墙壁碰撞检测
       const r = ball.r;
       const bounceRestitution = 0.92;
 
-      // 左右侧壁
       if (ball.x - r < 0) {
         ball.x = r;
         ball.vx = -ball.vx * bounceRestitution;
@@ -331,21 +327,18 @@ class GameEngine {
         this.onBallWallBounce(ball);
       }
 
-      // 顶部墙壁反弹边界：严格限制在 hudBottom 之下，确保弹球绝不会进入或穿透到 HUD 背后
-      const topBoundary = Math.max(70 * this.scale, (this.hudBottom || 126) + (10 * this.scale));
+      const topBoundary = Math.max(80 * this.scale, (this.hudBottom || 135) + (14 * this.scale));
       if (ball.y - r < topBoundary) {
         ball.y = topBoundary + r;
         ball.vy = -ball.vy * bounceRestitution;
         this.onBallWallBounce(ball);
       }
 
-      // 底部出界
       if (ball.y - r > this.height) {
         this.onBallLost();
         return;
       }
 
-      // 碰撞检测：蘑菇反弹器
       this.bumpers.forEach(b => {
         const dx = ball.x - b.x;
         const dy = ball.y - b.y;
@@ -359,7 +352,6 @@ class GameEngine {
           ball.x += nx * overlap;
           ball.y += ny * overlap;
 
-          // 弹性强力反弹
           const dot = ball.vx * nx + ball.vy * ny;
           if (dot < 0) {
             const bounceSpeed = Math.max(380 * this.scale, Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * 1.15);
@@ -378,7 +370,6 @@ class GameEngine {
         }
       });
 
-      // 碰撞检测：目标汉字球
       for (const target of this.targets) {
         if (!target.active) continue;
 
@@ -389,11 +380,9 @@ class GameEngine {
 
         if (dist < minDist) {
           if (ball.word === target.word) {
-            // 正确命中目标！
             this.onTargetHit(target, ball);
             break;
           } else {
-            // 撞到非目标字（撞错）
             this.onTargetMismatch(target, ball);
             break;
           }
@@ -419,19 +408,22 @@ class GameEngine {
     this.page.updateHUD(this.score, this.combo, '');
     if (this.nextBallTimeout) clearTimeout(this.nextBallTimeout);
     this.nextBallTimeout = setTimeout(() => {
-      if (this.isRunning && !this.isCleared) this.spawnNextBall();
+      if (this.isRunning && !this.isCleared) this.spawnNextBall(true);
     }, 400);
   }
 
   onTargetMismatch(target, ball) {
     target.shakeTime = 1.0;
     AudioManager.instance.playSFX('sfx_mismatch');
-    AudioManager.instance.playWrongWord(target.word);
 
-    // 记录错字统计
+    const now = Date.now();
+    if (!this.isCelebratingHit && !AudioManager.instance.isSpeaking && now - this.lastWrongVoiceTime > 1500) {
+      this.lastWrongVoiceTime = now;
+      AudioManager.instance.playWrongWord(target.word);
+    }
+
     StorageManager.instance.recordMiss(target.word);
 
-    // 弹性弹开
     const dx = ball.x - target.x;
     const dy = ball.y - target.y;
     const dist = Math.max(0.1, Math.sqrt(dx * dx + dy * dy));
@@ -446,24 +438,21 @@ class GameEngine {
   onTargetHit(target, ball) {
     target.active = false;
     ball.state = 'DEAD';
+    this.isCelebratingHit = true;
 
     this.combo++;
     const pts = 10 * this.combo;
     this.score += pts;
 
-    // 产生五彩烟花爆炸粒子
     this.createCelebrationParticles(target.x, target.y);
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_match');
-    AudioManager.instance.playWordWithPhrase(target.word);
 
-    // 记录命中数据
     StorageManager.instance.recordHit(target.word, this.levelData.grade, this.levelData.level);
 
-    // 触发大字结算浮层
     this.page.showBigWord(target.word, target.pinyin, pts);
     this.page.updateHUD(this.score, this.combo, target.word);
 
-    // 检查是否通关
     const remaining = this.targets.filter(t => t.active);
     if (remaining.length === 0) {
       this.isCleared = true;
@@ -471,14 +460,26 @@ class GameEngine {
         clearTimeout(this.nextBallTimeout);
         this.nextBallTimeout = null;
       }
-      setTimeout(() => {
+      // 严格等待命中词组语音播报完毕后，再触发通关语音与结算弹窗
+      AudioManager.instance.playWordWithPhrase(target.word, () => {
+        this.isCelebratingHit = false;
         this.onLevelCleared();
-      }, 700);
+      });
     } else {
       if (this.nextBallTimeout) clearTimeout(this.nextBallTimeout);
       this.nextBallTimeout = setTimeout(() => {
-        if (this.isRunning && !this.isCleared) this.spawnNextBall();
-      }, 900);
+        if (this.isRunning && !this.isCleared) {
+          this.spawnNextBall(false);
+        }
+      }, 750);
+
+      // 严格等待命中词组语音播报完毕后，再播报下一颗待命弹珠的引导音
+      AudioManager.instance.playWordWithPhrase(target.word, () => {
+        this.isCelebratingHit = false;
+        if (this.isRunning && !this.isCleared && this.currentBall && this.currentBall.state === 'READY') {
+          AudioManager.instance.playMissionPrompt(this.currentBall.word);
+        }
+      });
     }
   }
 
@@ -491,6 +492,7 @@ class GameEngine {
       this.nextBallTimeout = null;
     }
     this.stop();
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_win');
     AudioManager.instance.playVoice('vo_clear');
     StorageManager.instance.recordLevelWin(this.levelData.grade, this.levelData.level, 3);
@@ -536,11 +538,9 @@ class GameEngine {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, this.width, this.height);
 
-    // 1. 绘制背景装饰 (鹅黄底色 + 漂浮微云)
     ctx.fillStyle = '#FFF9E6';
     ctx.fillRect(0, 0, this.width, this.height);
 
-    // 2. 绘制反弹蘑菇 (Bumpers)
     this.bumpers.forEach(b => {
       const scale = 1 + b.bumpAnim * 0.25;
       const r = b.r * scale;
@@ -548,13 +548,11 @@ class GameEngine {
       ctx.save();
       ctx.translate(b.x, b.y);
 
-      // 阴影
       ctx.fillStyle = 'rgba(141, 110, 99, 0.15)';
       ctx.beginPath();
       ctx.ellipse(0, r * 0.9, r * 1.1, r * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // 蘑菇伞盖
       const grad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
       grad.addColorStop(0, '#FF8A80');
       grad.addColorStop(1, '#FF5252');
@@ -563,7 +561,6 @@ class GameEngine {
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.fill();
 
-      // 白色斑点
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.arc(-r * 0.35, -r * 0.25, r * 0.2, 0, Math.PI * 2);
@@ -574,7 +571,6 @@ class GameEngine {
       ctx.restore();
     });
 
-    // 3. 绘制目标汉字方块/圆泡泡 (Targets)
     this.targets.forEach(t => {
       if (!t.active) return;
 
@@ -585,13 +581,11 @@ class GameEngine {
       ctx.save();
       ctx.translate(t.x + shakeX, t.y);
 
-      // 泡泡外光晕
       ctx.fillStyle = t.isReview ? 'rgba(124, 77, 255, 0.15)' : 'rgba(255, 160, 0, 0.16)';
       ctx.beginPath();
       ctx.arc(0, 0, r + 8 * this.scale, 0, Math.PI * 2);
       ctx.fill();
 
-      // 泡泡本体渐变
       const grad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
       if (t.isReview) {
         grad.addColorStop(0, '#B388FF');
@@ -605,37 +599,31 @@ class GameEngine {
       ctx.arc(0, 0, r, 0, Math.PI * 2);
       ctx.fill();
 
-      // 泡泡边缘描边
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 3 * this.scale;
       ctx.stroke();
 
-      // 拼音 (小字)
       ctx.fillStyle = '#FFFDE7';
       ctx.font = `bold ${Math.round(14 * this.scale)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(t.pinyin, 0, -r * 0.42);
+      ctx.fillText(t.pinyin, 0, -r * 0.44);
 
-      // 汉字 (大字)
       ctx.fillStyle = '#FFFFFF';
       ctx.font = `900 ${Math.round(44 * this.scale)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(t.word, 0, r * 0.15);
+      ctx.fillText(t.word, 0, r * 0.14);
 
       ctx.restore();
     });
 
-    // 4. 绘制弹弓与皮筋 (Slingshot)
     this.renderSlingshot(ctx);
 
-    // 5. 绘制当前发射小球
     if (this.currentBall && this.currentBall.state !== 'DEAD') {
       this.renderBall(ctx, this.currentBall);
     }
 
-    // 6. 绘制爆炸与星星粒子
     this.particles.forEach(p => {
       ctx.save();
       ctx.globalAlpha = p.alpha;
@@ -655,13 +643,11 @@ class GameEngine {
 
     ctx.save();
 
-    // 弹弓木架底座
     ctx.strokeStyle = '#8D6E63';
     ctx.lineWidth = 14 * this.scale;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 左叉、右叉与主立柱
     ctx.beginPath();
     ctx.moveTo(this.anchorX, baseBottomY);
     ctx.lineTo(this.anchorX, this.anchorY + 16 * this.scale);
@@ -673,7 +659,6 @@ class GameEngine {
     ctx.lineTo(rightArmX, armTopY);
     ctx.stroke();
 
-    // 弹力橡皮筋 (拉动时绘制前后两条皮筋连接到小球)
     if (this.currentBall && (this.currentBall.state === 'READY' || this.isDragging)) {
       const bx = this.currentBall.x;
       const by = this.currentBall.y;
@@ -681,19 +666,16 @@ class GameEngine {
       ctx.strokeStyle = '#D84315';
       ctx.lineWidth = 5 * this.scale;
 
-      // 后皮筋
       ctx.beginPath();
       ctx.moveTo(leftArmX, armTopY);
       ctx.lineTo(bx - 15 * this.scale, by);
       ctx.stroke();
 
-      // 前皮筋
       ctx.beginPath();
       ctx.moveTo(rightArmX, armTopY);
       ctx.lineTo(bx + 15 * this.scale, by);
       ctx.stroke();
 
-      // 拖拽瞄准虚线预测轨迹
       if (this.isDragging) {
         const dx = this.anchorX - bx;
         const dy = this.anchorY - by;
@@ -721,7 +703,6 @@ class GameEngine {
 
     const r = ball.r;
 
-    // 拖尾特效 (绘制半透明光圈)
     if (ball.state === 'FLYING' && ball.trail.length > 0) {
       ball.trail.forEach((pos, idx) => {
         const trailAlpha = (1 - idx / ball.trail.length) * 0.35;
@@ -735,13 +716,11 @@ class GameEngine {
       });
     }
 
-    // 1. 地面柔和立体接触投影
     ctx.fillStyle = 'rgba(141, 110, 99, 0.16)';
     ctx.beginPath();
     ctx.ellipse(0, r * 0.85, r * 1.1, r * 0.35, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. 3D 琥珀琉璃球体底纹
     const bodyGrad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, r * 0.1, 0, 0, r);
     bodyGrad.addColorStop(0, '#FFE082');
     bodyGrad.addColorStop(0.65, '#FFA000');
@@ -752,7 +731,6 @@ class GameEngine {
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
 
-    // 3. 琉璃球体高光 Specular Highlight
     const lightGrad = ctx.createRadialGradient(-r * 0.35, -r * 0.35, 0, -r * 0.35, -r * 0.35, r * 0.55);
     lightGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
     lightGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.3)');
@@ -763,12 +741,10 @@ class GameEngine {
     ctx.arc(-r * 0.35, -r * 0.35, r * 0.55, 0, Math.PI * 2);
     ctx.fill();
 
-    // 4. 水晶内嵌汉字 (大字号、粗体、描边)
     ctx.font = `900 ${Math.round(44 * this.scale)}px sans-serif`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
 
-    // 阴影与描边
     ctx.strokeStyle = '#E65100';
     ctx.lineWidth = 3 * this.scale;
     ctx.strokeText(ball.word, 0, 2);

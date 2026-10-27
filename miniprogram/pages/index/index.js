@@ -3,7 +3,7 @@ const { GameEngine } = require('../../engine/GameEngine');
 const { EbbinghausEngine } = require('../../game/EbbinghausEngine');
 const { AudioManager } = require('../../game/AudioManager');
 const { StorageManager } = require('../../utils/Storage');
-const { VOCAB_TIERS, getWordPinyin, getWordPhrase } = require('../../data/vocab');
+const { VOCAB_TIERS, isExtWord, getWordPinyin, getWordPhrase } = require('../../data/vocab');
 const { MONSTER_LIST } = require('../../data/monsters');
 
 Page({
@@ -16,9 +16,21 @@ Page({
     currentGrade: 1,
     currentLevel: 0,
     currentLevelTitle: '',
+    levelList: [],
+    passedLevelCount: 0,
     targetWord: '',
     targetPinyin: '',
     targetPhrase: '',
+
+    // 游玩时间与防沉迷家长锁
+    sessionMinutes: 5,
+    remainingSeconds: 300,
+    timerText: '05:00',
+    pendingUnlockMins: 5,
+    showTimeLockModal: false,
+    lockGateQuestionText: '',
+    lockGateAnswer: 0,
+    lockGateOptions: [],
 
     // 命中大字浮层
     showBigWord: false,
@@ -41,10 +53,12 @@ Page({
 
     // 通关结算
     winWords: [],
+    winSummary: '',
 
     // 识字画册
     bookGrade: 1,
     bookMasteredCount: 0,
+    bookCounterText: '已掌握: 0 字',
     bookWordsList: [],
 
     // 怪兽图鉴
@@ -60,16 +74,17 @@ Page({
     masteredWordsCount: 0,
     parentStatsList: [],
 
-    // 等级说明
+    // 等级说明 (6级体系)
     gradeTips: {
-      1: "第 1 级 · 启蒙基础 (数词、自然天地、身体动作与亲人)",
-      2: "第 2 级 · 探索世界 (代词、四季气候、常见动物与生活色彩)",
-      3: "第 3 级 · 认知表达 (家庭成员、身体部位、疑问词与特征反义词)",
-      4: "第 4 级 · 逻辑空间 (方位定向、动作指令、身体感受与逻辑连接)",
-      5: "第 5 级 · 丰富表达 (量词度量、五味感官、形态细节与事理法则)"
+      1: "第 1 级 · 启蒙基础（核心60字+拓展28字 · 累计核心60字）",
+      2: "第 2 级 · 探索世界（核心60字+拓展30字 · 累计核心120字）",
+      3: "第 3 级 · 认知表达（核心60字+拓展32字 · 累计核心180字）",
+      4: "第 4 级 · 逻辑空间（核心60字+拓展40字 · 累计核心240字）",
+      5: "第 5 级 · 丰富表达（核心70字+拓展34字 · 累计核心310字）",
+      6: "第 6 级 · 读写进阶（核心80字 · 累计核心390字）"
     },
 
-    // 屏幕安全区与两层 HUD 布局参数 (适配刘海、状态栏与微信胶囊)
+    // 屏幕安全区与两层 HUD 布局参数
     statusBarHeight: 20,
     menuTop: 26,
     menuHeight: 32,
@@ -77,21 +92,107 @@ Page({
     capsulePaddingRight: 96,
     missionTop: 66,
     comboTop: 122,
-    totalHudHeight: 126,
+    totalHudHeight: 132,
     startPaddingTop: 74
   },
 
   onLoad() {
-    console.log('首页 onLoad');
     this.calculateSafeArea();
     const save = StorageManager.instance.data;
+    const curG = save.currentGrade || 1;
+    const totalG = EbbinghausEngine.getTotalLevelsInGrade(curG);
+    let curL = save.currentLevel || 0;
+    if (!StorageManager.instance.isLevelUnlocked(curG, curL)) {
+      curL = StorageManager.instance.getMaxUnlockedLevel(curG, totalG);
+    }
+    const rem = save.remainingSeconds || (save.sessionMinutes || 5) * 60;
     this.setData({
-      currentGrade: save.currentGrade || 1,
-      currentLevel: save.currentLevel || 0
+      currentGrade: curG,
+      currentLevel: curL,
+      sessionMinutes: save.sessionMinutes || 5,
+      pendingUnlockMins: save.sessionMinutes || 5,
+      remainingSeconds: rem,
+      timerText: this.formatTime(rem)
+    });
+    this.updateLevelList(curG);
+
+    if (save.isTimeLocked) {
+      this.openTimeLockModal();
+    }
+  },
+
+  onShow() {
+    this.updateLevelList(this.data.currentGrade || 1);
+  },
+
+  // 动态计算并刷新当前等级的关卡进阶列表（上一关通过解锁下一关，其余待解锁）
+  updateLevelList(grade) {
+    grade = grade || this.data.currentGrade || 1;
+    const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
+    const storage = StorageManager.instance;
+    const curLevel = this.data.currentLevel !== undefined ? this.data.currentLevel : (storage.data.currentLevel || 0);
+
+    let passedCount = 0;
+    const list = [];
+    for (let i = 0; i < total; i++) {
+      const passed = storage.isLevelPassed(grade, i);
+      const unlocked = storage.isLevelUnlocked(grade, i);
+      if (passed) passedCount++;
+
+      const stars = storage.data.starsPerLevel[`${grade}_${i}`] || 0;
+      let starText = '';
+      if (stars === 3) starText = '⭐⭐⭐';
+      else if (stars === 2) starText = '⭐⭐';
+      else if (stars === 1) starText = '⭐';
+
+      list.push({
+        index: i,
+        name: `第 ${i + 1} 关`,
+        unlocked: unlocked,
+        passed: passed,
+        stars: stars,
+        starText: starText,
+        isCurrent: (i === curLevel && unlocked)
+      });
+    }
+
+    this.setData({
+      levelList: list,
+      passedLevelCount: passedCount
     });
   },
 
-  // 计算屏幕安全区域与胶囊按钮对齐信息
+  // 点击选关卡：上一关通过才能进入下一关，否则拒绝并提示
+  selectLevel(e) {
+    const idx = Number(e.currentTarget.dataset.index);
+    const grade = this.data.currentGrade;
+    const storage = StorageManager.instance;
+
+    if (!storage.isLevelUnlocked(grade, idx)) {
+      AudioManager.instance.playSFX('sfx_mismatch');
+      wx.showToast({
+        title: `🔒 请先通过上一关才能解锁第 ${idx + 1} 关！`,
+        icon: 'none',
+        duration: 1800
+      });
+      return;
+    }
+
+    AudioManager.instance.playSFX('sfx_click');
+    this.setData({
+      currentLevel: idx
+    });
+    this.updateLevelList(grade);
+    this.startGame();
+  },
+
+  formatTime(sec) {
+    const s = Math.max(0, Math.floor(sec));
+    const mm = String(Math.floor(s / 60)).padStart(2, '0');
+    const ss = String(s % 60).padStart(2, '0');
+    return `${mm}:${ss}`;
+  },
+
   calculateSafeArea() {
     let menuTop = 26;
     let menuHeight = 32;
@@ -119,19 +220,12 @@ Page({
         menuBottom = menuTop + menuHeight;
         menuLeft = windowWidth - 94;
       }
-    } catch (e) {
-      console.warn('获取胶囊信息失败，使用默认布局:', e);
-    }
+    } catch (e) {}
 
-    // 胶囊左边缘到屏幕右边缘的距离 + 10px 间距，确保右侧按钮绝不与微信胶囊重叠
     const capsulePaddingRight = Math.max(88, (windowWidth - menuLeft) + 12);
-    // 第二行识字任务栏位于第一行胶囊栏正下方 8px
     const missionTop = menuBottom + 8;
-    // 连击提示位于任务栏下方
     const comboTop = missionTop + 54;
-    // HUD 总占用高度 (传给物理引擎作为顶部反弹天花板)
-    const totalHudHeight = missionTop + 56;
-    // 首页欢迎界面的顶部留白
+    const totalHudHeight = missionTop + 62;
     const startPaddingTop = menuBottom + 16;
 
     this.setData({
@@ -156,6 +250,8 @@ Page({
   },
 
   onUnload() {
+    this.stopSessionTimer();
+    AudioManager.instance.stopVoice();
     if (this.gameEngine) {
       this.gameEngine.stop();
     }
@@ -167,7 +263,6 @@ Page({
       .fields({ node: true, size: true })
       .exec((res) => {
         if (!res || !res[0] || !res[0].node) {
-          console.warn('获取 Canvas 节点失败，稍后重试');
           setTimeout(() => this.initCanvas(), 300);
           return;
         }
@@ -186,13 +281,11 @@ Page({
         this.gameEngine = new GameEngine(canvas, ctx, this);
         this.gameEngine.setHudBottom(this.data.totalHudHeight);
         this.gameEngine.resize(res[0].width, res[0].height, dpr);
-        console.log('GameEngine 初始化就绪，画布尺寸:', res[0].width, res[0].height);
       });
   },
 
-  // 触摸手势分发到物理引擎
   handleTouchStart(e) {
-    if (!this.data.isPlaying || !this.gameEngine) return;
+    if (!this.data.isPlaying || !this.gameEngine || StorageManager.instance.data.isTimeLocked) return;
     const touch = e.touches[0];
     if (touch) {
       this.gameEngine.onTouchStart(touch.x, touch.y);
@@ -200,7 +293,7 @@ Page({
   },
 
   handleTouchMove(e) {
-    if (!this.data.isPlaying || !this.gameEngine) return;
+    if (!this.data.isPlaying || !this.gameEngine || StorageManager.instance.data.isTimeLocked) return;
     const touch = e.touches[0];
     if (touch) {
       this.gameEngine.onTouchMove(touch.x, touch.y);
@@ -208,7 +301,7 @@ Page({
   },
 
   handleTouchEnd() {
-    if (!this.data.isPlaying || !this.gameEngine) return;
+    if (!this.data.isPlaying || !this.gameEngine || StorageManager.instance.data.isTimeLocked) return;
     this.gameEngine.onTouchEnd();
   },
 
@@ -217,17 +310,165 @@ Page({
     const g = Number(e.currentTarget.dataset.grade);
     AudioManager.instance.playSFX('sfx_click');
     StorageManager.instance.setGrade(g);
+    const total = EbbinghausEngine.getTotalLevelsInGrade(g);
+    const maxUnlocked = StorageManager.instance.getMaxUnlockedLevel(g, total);
     this.setData({
       currentGrade: g,
-      currentLevel: 0
+      currentLevel: maxUnlocked
+    });
+    this.updateLevelList(g);
+  },
+
+  // 选择单次游玩时长 (3 / 5 / 8 分钟)
+  selectSessionTime(e) {
+    const mins = Number(e.currentTarget.dataset.mins);
+    AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.openTimeLockModal();
+      return;
+    }
+    StorageManager.instance.setSessionMinutes(mins, true);
+    const rem = mins * 60;
+    this.setData({
+      sessionMinutes: mins,
+      pendingUnlockMins: mins,
+      remainingSeconds: rem,
+      timerText: this.formatTime(rem)
+    });
+  },
+
+  selectUnlockMins(e) {
+    const mins = Number(e.currentTarget.dataset.mins);
+    AudioManager.instance.playSFX('sfx_click');
+    this.setData({
+      pendingUnlockMins: mins
+    });
+  },
+
+  startSessionTimer() {
+    this.stopSessionTimer();
+    this.sessionTimerId = setInterval(() => {
+      if (!this.data.isPlaying || this.data.showPauseModal || this.data.showIntroModal) return;
+      if (StorageManager.instance.data.isTimeLocked) {
+        this.handleTimeUp();
+        return;
+      }
+
+      const nextSec = Math.max(0, (StorageManager.instance.data.remainingSeconds || 0) - 1);
+      StorageManager.instance.data.remainingSeconds = nextSec;
+      StorageManager.instance.save();
+
+      this.setData({
+        remainingSeconds: nextSec,
+        timerText: this.formatTime(nextSec)
+      });
+
+      if (nextSec <= 0) {
+        this.handleTimeUp();
+      }
+    }, 1000);
+  },
+
+  stopSessionTimer() {
+    if (this.sessionTimerId) {
+      clearInterval(this.sessionTimerId);
+      this.sessionTimerId = null;
+    }
+  },
+
+  handleTimeUp() {
+    StorageManager.instance.lockByTimeUp();
+    this.stopSessionTimer();
+    AudioManager.instance.stopVoice();
+    if (this.gameEngine) {
+      this.gameEngine.stop();
+    }
+    this.setData({
+      showIntroModal: false,
+      showPauseModal: false,
+      showWinModal: false
+    });
+    this.openTimeLockModal();
+  },
+
+  openTimeLockModal() {
+    const numWords = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+    const a = Math.floor(Math.random() * 6) + 3;
+    const b = Math.floor(Math.random() * 6) + 3;
+    const ans = a * b;
+
+    const opts = new Set([ans]);
+    while (opts.size < 4) {
+      const c = ans + Math.floor(Math.random() * 13) - 6;
+      if (c > 0) opts.add(c);
+    }
+    const arr = Array.from(opts).sort(() => Math.random() - 0.5);
+
+    this.setData({
+      pendingUnlockMins: StorageManager.instance.data.sessionMinutes || 5,
+      lockGateQuestionText: `${numWords[a]} 乘以 ${numWords[b]} 等于几？`,
+      lockGateAnswer: ans,
+      lockGateOptions: arr,
+      showTimeLockModal: true
+    });
+  },
+
+  handleLockGateAnswer(e) {
+    const val = Number(e.currentTarget.dataset.val);
+    if (val === this.data.lockGateAnswer) {
+      AudioManager.instance.playSFX('sfx_bumper');
+      const mins = this.data.pendingUnlockMins || 5;
+      StorageManager.instance.unlockByParent(mins);
+      const rem = mins * 60;
+      this.setData({
+        showTimeLockModal: false,
+        sessionMinutes: mins,
+        remainingSeconds: rem,
+        timerText: this.formatTime(rem)
+      });
+      if (this.data.isPlaying && this.gameEngine) {
+        this.gameEngine.start();
+        this.startSessionTimer();
+      }
+    } else {
+      AudioManager.instance.playSFX('sfx_mismatch');
+      this.openTimeLockModal();
+    }
+  },
+
+  closeTimeLockToHome() {
+    AudioManager.instance.playSFX('sfx_click');
+    this.stopSessionTimer();
+    AudioManager.instance.stopVoice();
+    if (this.gameEngine) this.gameEngine.stop();
+    this.setData({
+      showTimeLockModal: false,
+      isPlaying: false
     });
   },
 
   // 开始游戏 -> 弹出本关生字预览
   startGame() {
     AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.openTimeLockModal();
+      return;
+    }
+
+    const mins = this.data.sessionMinutes || 5;
+    StorageManager.instance.setSessionMinutes(mins, true);
+    const rem = mins * 60;
+
     const grade = this.data.currentGrade;
-    const levelIdx = StorageManager.instance.data.currentLevel || 0;
+    const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
+    let levelIdx = this.data.currentLevel;
+    if (levelIdx === undefined || levelIdx === null) {
+      levelIdx = StorageManager.instance.data.currentLevel || 0;
+    }
+    // 关卡锁定检查：若未解锁则自动跳转至该等级已解锁的最大关卡
+    if (!StorageManager.instance.isLevelUnlocked(grade, levelIdx)) {
+      levelIdx = StorageManager.instance.getMaxUnlockedLevel(grade, total);
+    }
 
     const levelDef = EbbinghausEngine.generateLevel(grade, levelIdx, true);
     this.currentLevelDef = levelDef;
@@ -242,9 +483,12 @@ Page({
       showIntroModal: true,
       introWords: introWords,
       currentLevel: levelIdx,
-      currentLevelTitle: levelDef.title
+      currentLevelTitle: levelDef.title,
+      remainingSeconds: rem,
+      timerText: this.formatTime(rem)
     });
 
+    AudioManager.instance.stopVoice();
     if (introWords[0]) {
       AudioManager.instance.playWordWithPhrase(introWords[0].char);
     }
@@ -257,6 +501,11 @@ Page({
 
   // 确认开始弹射
   confirmStartLevel() {
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.openTimeLockModal();
+      return;
+    }
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_shoot');
     this.setData({
       showIntroModal: false,
@@ -264,6 +513,8 @@ Page({
       score: 0,
       combo: 0
     });
+
+    this.startSessionTimer();
 
     if (this.gameEngine && this.currentLevelDef) {
       this.gameEngine.loadLevel(this.currentLevelDef);
@@ -301,15 +552,20 @@ Page({
 
     setTimeout(() => {
       this.setData({ showBigWord: false });
-    }, 700);
+    }, 680);
   },
 
   // 通关结算
   showLevelWin(levelDef) {
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.data.currentGrade);
     const curLevel = this.data.currentLevel;
+
+    // 记录通关并解锁下一关
+    StorageManager.instance.recordLevelWin(this.data.currentGrade, curLevel, 3);
+    this.updateLevelList(this.data.currentGrade);
+
     const isGradeComplete = (curLevel + 1 >= totalInGrade);
-    let summary = `太棒了！顺利通过第 ${curLevel + 1} 关！`;
+    let summary = `太棒了！顺利通过第 ${curLevel + 1} 关！下一关已解锁！`;
     if (isGradeComplete) {
       summary = `🎉 恭喜通关第 ${this.data.currentGrade} 级全部字词！`;
     }
@@ -323,20 +579,35 @@ Page({
 
   // 下一关 (继续)
   nextLevel() {
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.setData({ showWinModal: false });
+      this.openTimeLockModal();
+      return;
+    }
+
     const totalInGrade = EbbinghausEngine.getTotalLevelsInGrade(this.data.currentGrade);
     let grade = this.data.currentGrade;
     let nextL = this.data.currentLevel + 1;
 
-    // 如果当前等级通关了，自动晋级到下一个等级
     if (nextL >= totalInGrade) {
-      if (grade < 5) {
+      if (grade < 6) {
         grade++;
         nextL = 0;
         StorageManager.instance.setGrade(grade);
       } else {
         nextL = 0;
       }
+    }
+
+    // 检查下一关是否已解锁（必须上一关通过）
+    if (!StorageManager.instance.isLevelUnlocked(grade, nextL)) {
+      wx.showToast({
+        title: `🔒 下一关尚未解锁哦！`,
+        icon: 'none'
+      });
+      return;
     }
 
     const levelDef = EbbinghausEngine.generateLevel(grade, nextL, true);
@@ -350,6 +621,7 @@ Page({
       score: 0,
       combo: 0
     });
+    this.updateLevelList(grade);
 
     if (this.gameEngine) {
       this.gameEngine.loadLevel(levelDef);
@@ -359,7 +631,14 @@ Page({
 
   // 重新开始本关
   retryLevel() {
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.setData({ showPauseModal: false, showWinModal: false });
+      this.openTimeLockModal();
+      return;
+    }
+
     this.setData({
       showPauseModal: false,
       showWinModal: false
@@ -380,15 +659,23 @@ Page({
 
   resumeGame() {
     AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.setData({ showPauseModal: false });
+      this.openTimeLockModal();
+      return;
+    }
     this.setData({ showPauseModal: false });
     if (this.gameEngine) this.gameEngine.start();
   },
 
   quitToMenu() {
+    AudioManager.instance.stopVoice();
     AudioManager.instance.playSFX('sfx_click');
+    this.stopSessionTimer();
     if (this.gameEngine) this.gameEngine.stop();
     this.setData({
       showPauseModal: false,
+      showWinModal: false,
       isPlaying: false
     });
   },
@@ -396,6 +683,7 @@ Page({
   toggleMute() {
     const nextMuted = !this.data.isMuted;
     AudioManager.instance.muted = nextMuted;
+    if (nextMuted) AudioManager.instance.stopVoice();
     this.setData({ isMuted: nextMuted });
   },
 
@@ -417,6 +705,7 @@ Page({
     const tier = VOCAB_TIERS[grade] || VOCAB_TIERS[1];
     const stats = StorageManager.instance.data.stats;
     let totalMastered = 0;
+    let gradeMastered = 0;
 
     Object.keys(stats).forEach(k => {
       if (stats[k].hits > 0) totalMastered++;
@@ -425,17 +714,23 @@ Page({
     const wordsList = tier.words.map(ch => {
       const item = stats[ch];
       const isMastered = item && item.hits > 0;
+      if (isMastered) gradeMastered++;
       return {
         char: ch,
         pinyin: getWordPinyin(ch),
         phrase: getWordPhrase(ch),
-        isMastered: isMastered
+        isMastered: isMastered,
+        isExt: isExtWord(grade, ch)
       };
     });
+
+    const extDesc = tier.extWords.length > 0 ? `+拓展${tier.extWords.length}字` : '';
+    const counterText = `已掌握: ${totalMastered} 字 · 本级: ${gradeMastered}/${tier.words.length} (核心${tier.coreWords.length}字${extDesc} · 累计核心${tier.cumulativeCore}字)`;
 
     this.setData({
       bookGrade: grade,
       bookMasteredCount: totalMastered,
+      bookCounterText: counterText,
       bookWordsList: wordsList
     });
   },
@@ -505,6 +800,14 @@ Page({
     const val = Number(e.currentTarget.dataset.val);
     if (val === this.data.gateAnswer) {
       AudioManager.instance.playSFX('sfx_bumper');
+      if (StorageManager.instance.data.isTimeLocked) {
+        StorageManager.instance.unlockByParent();
+        const rem = StorageManager.instance.data.remainingSeconds;
+        this.setData({
+          remainingSeconds: rem,
+          timerText: this.formatTime(rem)
+        });
+      }
       this.setData({ showGateModal: false });
       this.openParentDashboard();
     } else {
