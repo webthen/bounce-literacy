@@ -32,6 +32,11 @@ Page({
     lockGateAnswer: 0,
     lockGateOptions: [],
 
+    // 孩子自主时间约定与30秒预警
+    showContractModal: false,
+    contractSelectedMins: 5,
+    showWarn30s: false,
+
     // 命中大字浮层
     showBigWord: false,
     hitWord: '',
@@ -179,11 +184,17 @@ Page({
     }
 
     AudioManager.instance.playSFX('sfx_click');
+    if (StorageManager.instance.data.isTimeLocked) {
+      this.openTimeLockModal();
+      return;
+    }
     this.setData({
       currentLevel: idx
     });
+    StorageManager.instance.data.currentLevel = idx;
+    StorageManager.instance.save();
     this.updateLevelList(grade);
-    this.startGame();
+    this.openContractModal();
   },
 
   formatTime(sec) {
@@ -363,10 +374,25 @@ Page({
         timerText: this.formatTime(nextSec)
       });
 
+      // 剩余 30 秒温馨预警 (视觉横幅 + 专属 Fish Audio 语音)
+      if (nextSec <= 30 && !this.hasWarned30s && nextSec > 0) {
+        this.hasWarned30s = true;
+        this.trigger30sWarning();
+      }
+
       if (nextSec <= 0) {
         this.handleTimeUp();
       }
     }, 1000);
+  },
+
+  trigger30sWarning() {
+    AudioManager.instance.playVoice('vo_warn_30s');
+    this.setData({ showWarn30s: true });
+    if (this.warnTimer) clearTimeout(this.warnTimer);
+    this.warnTimer = setTimeout(() => {
+      this.setData({ showWarn30s: false });
+    }, 5000);
   },
 
   stopSessionTimer() {
@@ -384,6 +410,8 @@ Page({
       this.gameEngine.stop();
     }
     this.setData({
+      showContractModal: false,
+      showWarn30s: false,
       showIntroModal: false,
       showPauseModal: false,
       showWinModal: false
@@ -411,6 +439,14 @@ Page({
       lockGateOptions: arr,
       showTimeLockModal: true
     });
+    // 游玩时间截止时，亲切女声提醒小朋友休息眼睛并请家长解锁
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_timeup');
+  },
+
+  playTimeUpVoice() {
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_timeup');
   },
 
   handleLockGateAnswer(e) {
@@ -419,6 +455,7 @@ Page({
       AudioManager.instance.playSFX('sfx_bumper');
       const mins = this.data.pendingUnlockMins || 5;
       StorageManager.instance.unlockByParent(mins);
+      this.hasWarned30s = false;
       const rem = mins * 60;
       this.setData({
         showTimeLockModal: false,
@@ -447,17 +484,13 @@ Page({
     });
   },
 
-  // 开始游戏 -> 弹出本关生字预览
+  // 开始游戏 -> 弹出时间契约弹窗
   startGame() {
     AudioManager.instance.playSFX('sfx_click');
     if (StorageManager.instance.data.isTimeLocked) {
       this.openTimeLockModal();
       return;
     }
-
-    const mins = this.data.sessionMinutes || 5;
-    StorageManager.instance.setSessionMinutes(mins, true);
-    const rem = mins * 60;
 
     const grade = this.data.currentGrade;
     const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
@@ -466,6 +499,70 @@ Page({
       levelIdx = StorageManager.instance.data.currentLevel || 0;
     }
     // 关卡锁定检查：若未解锁则自动跳转至该等级已解锁的最大关卡
+    if (!StorageManager.instance.isLevelUnlocked(grade, levelIdx)) {
+      levelIdx = StorageManager.instance.getMaxUnlockedLevel(grade, total);
+      this.setData({ currentLevel: levelIdx });
+      StorageManager.instance.data.currentLevel = levelIdx;
+      StorageManager.instance.save();
+    }
+
+    this.openContractModal();
+  },
+
+  openContractModal() {
+    const curMins = this.data.sessionMinutes || 5;
+    this.setData({
+      contractSelectedMins: curMins,
+      showContractModal: true
+    });
+    // 打开契约弹窗时，亲切女声引导小朋友做自主约定
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_contract_intro');
+  },
+
+  playContractIntroVoice() {
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_contract_intro');
+  },
+
+  selectContractMins(e) {
+    const mins = Number(e.currentTarget.dataset.mins) || 5;
+    AudioManager.instance.playSFX('sfx_click');
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice(`vo_opt_${mins}`);
+    this.setData({
+      contractSelectedMins: mins
+    });
+  },
+
+  confirmContract() {
+    AudioManager.instance.playSFX('sfx_click');
+    const mins = this.data.contractSelectedMins || 5;
+    this.hasWarned30s = false;
+
+    // 播放自主契约承诺确认语音 (Fish Audio 亲切女声)
+    AudioManager.instance.playVoice(`vo_contract_${mins}`);
+
+    StorageManager.instance.setSessionMinutes(mins, true);
+    const rem = mins * 60;
+    this.setData({
+      showContractModal: false,
+      sessionMinutes: mins,
+      pendingUnlockMins: mins,
+      remainingSeconds: rem,
+      timerText: this.formatTime(rem)
+    });
+
+    this.launchLevelGame();
+  },
+
+  launchLevelGame() {
+    const grade = this.data.currentGrade;
+    const total = EbbinghausEngine.getTotalLevelsInGrade(grade);
+    let levelIdx = this.data.currentLevel;
+    if (levelIdx === undefined || levelIdx === null) {
+      levelIdx = StorageManager.instance.data.currentLevel || 0;
+    }
     if (!StorageManager.instance.isLevelUnlocked(grade, levelIdx)) {
       levelIdx = StorageManager.instance.getMaxUnlockedLevel(grade, total);
     }
@@ -483,9 +580,7 @@ Page({
       showIntroModal: true,
       introWords: introWords,
       currentLevel: levelIdx,
-      currentLevelTitle: levelDef.title,
-      remainingSeconds: rem,
-      timerText: this.formatTime(rem)
+      currentLevelTitle: levelDef.title
     });
 
     AudioManager.instance.stopVoice();

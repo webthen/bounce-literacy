@@ -304,7 +304,7 @@
   <!-- 时间截止 · 家长防沉迷解锁弹窗 -->
   <view class="modal-mask" wx:if="{{showTimeLockModal}}">
     <view class="card">
-      <view class="modal-icon">⏰👀</view>
+      <view class="modal-icon" bindtap="playTimeUpVoice">⏰👀 <text style="font-size: 32rpx; vertical-align: middle;">🔊</text></view>
       <view class="modal-title color-red">游玩时间到啦！</view>
       <view class="modal-subtitle">
         小眼睛已经连续学习满设定时长啦，先看看远方休息一下吧！如需继续游玩，请由家长选择时长并完成算术解锁：
@@ -375,6 +375,68 @@
       </scroll-view>
 
       <view class="btn-close" bindtap="closeParentModal">完成退出</view>
+    </view>
+  </view>
+
+  <!-- 孩子自主时间约定小契约弹窗 -->
+  <view class="modal-mask" wx:if="{{showContractModal}}">
+    <view class="card contract-card-modal">
+      <view class="contract-modal-header" bindtap="playContractIntroVoice">
+        <view class="contract-header-icon">⏱️✨</view>
+        <view class="contract-title">挑战时间小约定 <text style="font-size: 32rpx; vertical-align: middle;">🔊</text></view>
+        <view class="contract-subtitle">小朋友，自己决定本次玩多久？对自己负责，说话算话哦！</view>
+      </view>
+
+      <view class="contract-options-grid">
+        <view 
+          class="contract-opt-card {{contractSelectedMins === 3 ? 'active' : ''}}"
+          bindtap="selectContractMins"
+          data-mins="3"
+        >
+          <view class="contract-badge-tag">⚡ 快速挑战</view>
+          <view class="contract-time-num">3 <text class="contract-unit">分钟</text></view>
+          <view class="contract-desc-text">闪电快充·轻松练</view>
+          <view class="contract-check-mark" wx:if="{{contractSelectedMins === 3}}">✔</view>
+        </view>
+
+        <view 
+          class="contract-opt-card {{contractSelectedMins === 5 ? 'active' : ''}}"
+          bindtap="selectContractMins"
+          data-mins="5"
+        >
+          <view class="contract-badge-tag rec">🚀 推荐时长</view>
+          <view class="contract-time-num">5 <text class="contract-unit">分钟</text></view>
+          <view class="contract-desc-text">专注探索·护眼好</view>
+          <view class="contract-check-mark" wx:if="{{contractSelectedMins === 5}}">✔</view>
+        </view>
+
+        <view 
+          class="contract-opt-card {{contractSelectedMins === 8 ? 'active' : ''}}"
+          bindtap="selectContractMins"
+          data-mins="8"
+        >
+          <view class="contract-badge-tag deep">🏆 识字大师</view>
+          <view class="contract-time-num">8 <text class="contract-unit">分钟</text></view>
+          <view class="contract-desc-text">深度挑战·大满贯</view>
+          <view class="contract-check-mark" wx:if="{{contractSelectedMins === 8}}">✔</view>
+        </view>
+      </view>
+
+      <view class="contract-promise-box">
+        <text class="promise-icon">🤝</text>
+        <text class="promise-text">我的承诺：我约定挑战 {{contractSelectedMins}} 分钟，时间到了主动休息眼睛！</text>
+      </view>
+
+      <view class="btn-contract-confirm" bindtap="confirmContract">🤝 我能做到，开始挑战！</view>
+    </view>
+  </view>
+
+  <!-- 剩余30秒倒计时浮动预警横幅 (不阻挡操作，避让胶囊) -->
+  <view class="warn-30s-toast {{showWarn30s ? 'show' : ''}}" style="top: {{menuTop + menuHeight + 10}}px;">
+    <text class="warn-toast-icon">⏳</text>
+    <view class="warn-toast-content">
+      <view class="warn-toast-title">时间还剩最后 30 秒啦！</view>
+      <view class="warn-toast-desc">准备打完收尾，保护小眼睛哦~</view>
     </view>
   </view>
 </view>

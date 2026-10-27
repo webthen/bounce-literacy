@@ -22,7 +22,16 @@ const VOICE_TEXT_MAP: Record<string, string> = {
   vo_clear: '恭喜过关！你真棒！',
   vo_combo: '好厉害，连续命中！',
   vo_intro: '点一点汉字卡片，听听它们怎么读吧！',
-  vo_win_review: '太棒啦！来复习一下本关认识的汉字吧！'
+  vo_win_review: '太棒啦！来复习一下本关认识的汉字吧！',
+  vo_warn_30s: '时间还剩最后30秒啦，准备收尾咯！',
+  vo_contract_3: '约定好啦，挑战3分钟，说话算话哦！',
+  vo_contract_5: '约定好啦，挑战5分钟，说话算话哦！',
+  vo_contract_8: '约定好啦，挑战8分钟，说话算话哦！',
+  vo_contract_intro: '小朋友，自己决定本次玩多久？对自己负责，说话算话哦！',
+  vo_timeup: '时间到啦！小眼睛休息一下，看看远方，请爸爸妈妈来解锁吧！',
+  vo_opt_3: '3分钟，快速挑战！',
+  vo_opt_5: '5分钟，推荐时长！',
+  vo_opt_8: '8分钟，识字大师！'
 };
 
 function getWordAudioCode(char: string): string {

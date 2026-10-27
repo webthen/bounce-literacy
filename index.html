@@ -877,6 +877,203 @@
       font-size: 10px;
     }
 
+    /* 孩子自主时间约定小契约弹窗 */
+    .contract-card-modal {
+      width: 460px;
+      max-width: 92%;
+      background: #FFFFFF;
+      border: 4px solid #FFE082;
+      border-radius: 28px;
+      padding: 24px 20px;
+      box-shadow: 0 16px 36px rgba(255, 111, 0, 0.22);
+      text-align: center;
+      animation: modalPopIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .contract-modal-header {
+      margin-bottom: 14px;
+    }
+    .contract-header-icon {
+      font-size: 44px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .contract-title {
+      font-size: 24px;
+      font-weight: 900;
+      color: #E65100;
+      margin-bottom: 4px;
+    }
+    .contract-subtitle {
+      font-size: 13px;
+      color: #795548;
+      line-height: 1.4;
+      font-weight: bold;
+    }
+    .contract-options-grid {
+      display: flex;
+      gap: 10px;
+      margin: 16px 0;
+      justify-content: center;
+    }
+    .contract-opt-card {
+      flex: 1;
+      max-width: 130px;
+      background: #FFFDE7;
+      border: 3px solid #FFF59D;
+      border-radius: 18px;
+      padding: 12px 6px;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      user-select: none;
+      box-sizing: border-box;
+    }
+    .contract-opt-card:hover {
+      transform: translateY(-3px);
+      border-color: #FFB300;
+    }
+    .contract-opt-card:active {
+      transform: scale(0.96);
+    }
+    .contract-opt-card.active {
+      background: linear-gradient(180deg, #FFF9C4 0%, #FFE082 100%);
+      border: 3px solid #FF8F00;
+      box-shadow: 0 6px 18px rgba(255, 143, 0, 0.38);
+      transform: scale(1.04);
+    }
+    .contract-badge-tag {
+      font-size: 10px;
+      font-weight: 800;
+      padding: 2px 6px;
+      border-radius: 8px;
+      background: #E0F2F1;
+      color: #00796B;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+    .contract-badge-tag.rec {
+      background: #FFE082;
+      color: #E65100;
+      border: 1px solid #FFA000;
+    }
+    .contract-badge-tag.deep {
+      background: #EDE7F6;
+      color: #512DA8;
+    }
+    .contract-time-num {
+      font-size: 28px;
+      font-weight: 900;
+      color: #D84315;
+      line-height: 1.1;
+    }
+    .contract-unit {
+      font-size: 12px;
+      color: #6D4C41;
+      font-weight: bold;
+    }
+    .contract-desc-text {
+      font-size: 10px;
+      color: #8D6E63;
+      margin-top: 4px;
+      line-height: 1.2;
+    }
+    .contract-check-mark {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 20px;
+      height: 20px;
+      background: #4CAF50;
+      color: #FFF;
+      border-radius: 50%;
+      font-size: 12px;
+      font-weight: 900;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #FFF;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+    }
+    .contract-opt-card.active .contract-check-mark {
+      display: flex;
+    }
+    .contract-promise-box {
+      background: #F1F8E9;
+      border: 2px dashed #81C784;
+      border-radius: 14px;
+      padding: 8px 12px;
+      margin-bottom: 18px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #2E7D32;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .btn-contract-confirm {
+      background: linear-gradient(180deg, #66BB6A 0%, #388E3C 100%);
+      color: #FFF;
+      font-size: 20px;
+      font-weight: 900;
+      border: 3px solid #FFF;
+      padding: 12px 36px;
+      border-radius: 30px;
+      box-shadow: 0 8px 20px rgba(56, 142, 60, 0.42);
+      cursor: pointer;
+      transition: transform 0.1s;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .btn-contract-confirm:active {
+      transform: scale(0.96);
+    }
+
+    /* 剩余30秒悬浮预警横幅 */
+    .warn-30s-toast {
+      position: fixed;
+      top: 66px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-100px);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: linear-gradient(135deg, #FF6F00, #E65100);
+      color: #FFF;
+      padding: 10px 22px;
+      border-radius: 32px;
+      border: 2px solid #FFE082;
+      box-shadow: 0 8px 24px rgba(230, 81, 0, 0.45);
+      transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+      white-space: nowrap !important;
+    }
+    .warn-30s-toast.show {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+    .warn-toast-icon {
+      font-size: 26px;
+      animation: pulseCombo 0.6s infinite alternate;
+    }
+    .warn-toast-content {
+      display: flex;
+      flex-direction: column;
+      text-align: left;
+    }
+    .warn-toast-title {
+      font-size: 15px;
+      font-weight: 900;
+      color: #FFF;
+    }
+    .warn-toast-desc {
+      font-size: 11px;
+      color: #FFE082;
+      font-weight: bold;
+    }
+
     .btn-start-huge {
       background: linear-gradient(180deg, #66BB6A 0%, #388E3C 100%);
       color: #FFF;
@@ -1495,7 +1692,7 @@
     <!-- 时间截止 · 家长防沉迷解锁弹窗 -->
     <div class="modal-mask" id="time-lock-modal">
       <div class="card" style="width: 480px;">
-        <div style="font-size: 46px; line-height: 1; margin-bottom: 6px;">⏰👀</div>
+        <div style="font-size: 46px; line-height: 1; margin-bottom: 6px; cursor: pointer;" id="btn-replay-timeup-voice" title="点击重听语音">⏰👀 <span style="font-size: 20px; vertical-align: middle;">🔊</span></div>
         <h2 style="font-size:26px; color:#D32F2F;">游玩时间到啦！</h2>
         <p style="font-size:14px; color:#5D4037; margin-top:6px;">
           小眼睛已经连续学习满设定时长啦，先看看远方休息一下吧！<br>
@@ -1512,6 +1709,51 @@
         <p style="font-size:22px; font-weight:bold; color:#E65100; margin:12px 0;" id="lock-gate-question">六 乘以 七 等于几？</p>
         <div class="gate-opts" id="lock-gate-options"></div>
         <button class="btn-close" id="btn-lock-back-home" style="margin-top:14px;">🏠 返回首页休息</button>
+      </div>
+    </div>
+
+    <!-- 孩子自主时间约定小契约弹窗 -->
+    <div class="modal-mask" id="contract-modal">
+      <div class="card contract-card-modal">
+        <div class="contract-modal-header" id="btn-replay-contract-voice" style="cursor: pointer;" title="点击重听语音">
+          <div class="contract-header-icon">⏱️✨</div>
+          <h2 class="contract-title">挑战时间小约定 <span style="font-size: 20px; vertical-align: middle;">🔊</span></h2>
+          <p class="contract-subtitle">小朋友，自己决定本次玩多久？对自己负责，说话算话哦！</p>
+        </div>
+        <div class="contract-options-grid" id="contract-options-grid">
+          <div class="contract-opt-card" data-mins="3">
+            <div class="contract-badge-tag">⚡ 快速挑战</div>
+            <div class="contract-time-num">3 <span class="contract-unit">分钟</span></div>
+            <div class="contract-desc-text">闪电快充 · 轻松练</div>
+            <div class="contract-check-mark">✔</div>
+          </div>
+          <div class="contract-opt-card active" data-mins="5">
+            <div class="contract-badge-tag rec">🚀 推荐时长</div>
+            <div class="contract-time-num">5 <span class="contract-unit">分钟</span></div>
+            <div class="contract-desc-text">专注探索 · 护眼好</div>
+            <div class="contract-check-mark">✔</div>
+          </div>
+          <div class="contract-opt-card" data-mins="8">
+            <div class="contract-badge-tag deep">🏆 识字大师</div>
+            <div class="contract-time-num">8 <span class="contract-unit">分钟</span></div>
+            <div class="contract-desc-text">深度挑战 · 大满贯</div>
+            <div class="contract-check-mark">✔</div>
+          </div>
+        </div>
+        <div class="contract-promise-box">
+          <span class="promise-icon">🤝</span>
+          <span class="promise-text" id="contract-promise-text">我的承诺：我约定挑战 5 分钟，时间到了主动休息眼睛！</span>
+        </div>
+        <button class="btn-contract-confirm" id="btn-confirm-contract">🤝 我能做到，开始挑战！</button>
+      </div>
+    </div>
+
+    <!-- 剩余30秒倒计时浮动预警横幅 (不阻挡操作，温和提醒) -->
+    <div class="warn-30s-toast" id="warn-30s-toast">
+      <span class="warn-toast-icon">⏳</span>
+      <div class="warn-toast-content">
+        <div class="warn-toast-title">时间还剩最后 30 秒啦！</div>
+        <div class="warn-toast-desc">准备打完收尾，保护小眼睛哦~</div>
       </div>
     </div>
   </div>

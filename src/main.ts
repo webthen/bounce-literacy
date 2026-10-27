@@ -13,6 +13,9 @@ class App {
   private isPausedByModal: boolean = false;
   private sessionTimerId: any = null;
   private pendingUnlockMins: number = 5;
+  private pendingContractMins: number = 5;
+  private hasWarned30s: boolean = false;
+  private warnToastTimer: any = null;
 
   constructor() {
     const isPortrait = window.innerHeight > window.innerWidth;
@@ -192,12 +195,7 @@ class App {
         curL = maxUnlocked;
         StorageManager.instance.data.currentLevel = curL;
       }
-      // 每次从首页点击进入游戏，按所选的 3 / 5 / 8 分钟开启本局倒计时
-      const mins = StorageManager.instance.data.sessionMinutes || 5;
-      StorageManager.instance.setSessionMinutes(mins, true);
-      startScreen!.classList.add('hidden');
-      hud!.style.display = 'flex';
-      this.startGame();
+      this.openContractModal();
     };
 
     // 暂停面板
@@ -332,6 +330,39 @@ class App {
         this.toggleInPageRotation();
       };
     });
+
+    // 时间约定契约弹窗选项交互
+    document.querySelectorAll('#contract-options-grid .contract-opt-card').forEach(card => {
+      (card as HTMLElement).onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        const mins = parseInt(card.getAttribute('data-mins') || '5');
+        this.selectContractMins(mins);
+      };
+    });
+
+    const btnConfirmContract = document.getElementById('btn-confirm-contract');
+    if (btnConfirmContract) {
+      btnConfirmContract.onclick = () => {
+        AudioManager.instance.playSFX('sfx_click');
+        this.confirmContract();
+      };
+    }
+
+    const btnReplayContract = document.getElementById('btn-replay-contract-voice');
+    if (btnReplayContract) {
+      btnReplayContract.onclick = () => {
+        AudioManager.instance.stopVoice();
+        AudioManager.instance.playVoice('vo_contract_intro');
+      };
+    }
+
+    const btnReplayTimeup = document.getElementById('btn-replay-timeup-voice');
+    if (btnReplayTimeup) {
+      btnReplayTimeup.onclick = () => {
+        AudioManager.instance.stopVoice();
+        AudioManager.instance.playVoice('vo_timeup');
+      };
+    }
   }
 
   private updateTimeButtons() {
@@ -371,14 +402,77 @@ class App {
         return;
       }
 
-      StorageManager.instance.data.remainingSeconds = Math.max(0, (StorageManager.instance.data.remainingSeconds || 0) - 1);
+      const nextSec = Math.max(0, (StorageManager.instance.data.remainingSeconds || 0) - 1);
+      StorageManager.instance.data.remainingSeconds = nextSec;
       StorageManager.instance.save();
       this.updateTimerBadgeUI();
 
-      if (StorageManager.instance.data.remainingSeconds <= 0) {
+      // 剩余 30 秒温馨预警 (视觉横幅 + 专属 Fish Audio 语音)
+      if (nextSec <= 30 && !this.hasWarned30s && nextSec > 0) {
+        this.hasWarned30s = true;
+        this.trigger30sWarning();
+      }
+
+      if (nextSec <= 0) {
         this.handleTimeUp();
       }
     }, 1000);
+  }
+
+  private trigger30sWarning() {
+    AudioManager.instance.playVoice('vo_warn_30s');
+    const toast = document.getElementById('warn-30s-toast');
+    if (toast) {
+      toast.classList.add('show');
+      if (this.warnToastTimer) clearTimeout(this.warnToastTimer);
+      this.warnToastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 5000);
+    }
+  }
+
+  private openContractModal() {
+    const curMins = StorageManager.instance.data.sessionMinutes || 5;
+    this.selectContractMins(curMins, false);
+    document.getElementById('contract-modal')?.classList.add('show');
+    // 打开契约弹窗时，亲切女声引导小朋友做自主约定
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_contract_intro');
+  }
+
+  private selectContractMins(mins: number, playVoice: boolean = true) {
+    this.pendingContractMins = mins;
+    document.querySelectorAll('#contract-options-grid .contract-opt-card').forEach(el => {
+      const m = parseInt(el.getAttribute('data-mins') || '5');
+      el.classList.toggle('active', m === mins);
+    });
+    const promiseEl = document.getElementById('contract-promise-text');
+    if (promiseEl) {
+      promiseEl.innerText = `我的承诺：我约定挑战 ${mins} 分钟，时间到了主动休息眼睛！`;
+    }
+    if (playVoice) {
+      AudioManager.instance.stopVoice();
+      AudioManager.instance.playVoice(`vo_opt_${mins}`);
+    }
+  }
+
+  private confirmContract() {
+    document.getElementById('contract-modal')?.classList.remove('show');
+    const mins = this.pendingContractMins || 5;
+    // 播放自主契约承诺确认语音 (Fish Audio 亲切女声)
+    AudioManager.instance.playVoice(`vo_contract_${mins}`);
+    StorageManager.instance.setSessionMinutes(mins, true);
+    this.hasWarned30s = false;
+    this.updateTimeButtons();
+    this.updateTimerBadgeUI();
+
+    const startScreen = document.getElementById('start-screen');
+    const hud = document.getElementById('game-hud');
+    if (startScreen && hud) {
+      startScreen.classList.add('hidden');
+      hud.style.display = 'flex';
+      this.startGame();
+    }
   }
 
   private stopSessionTimer() {
@@ -393,6 +487,8 @@ class App {
     this.stopSessionTimer();
     AudioManager.instance.stopVoice();
     this.isPausedByModal = true;
+    document.getElementById('contract-modal')?.classList.remove('show');
+    document.getElementById('warn-30s-toast')?.classList.remove('show');
     document.getElementById('intro-modal')?.classList.remove('show');
     document.getElementById('pause-modal')?.classList.remove('show');
     document.getElementById('win-modal')?.classList.remove('show');
@@ -402,6 +498,9 @@ class App {
   private openTimeLockModal() {
     this.pendingUnlockMins = StorageManager.instance.data.sessionMinutes || 5;
     this.updateTimeButtons();
+    // 游玩时间截止时，亲切女声提醒小朋友休息眼睛并请家长解锁
+    AudioManager.instance.stopVoice();
+    AudioManager.instance.playVoice('vo_timeup');
 
     const numWords = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
     const a = Math.floor(Math.random() * 6) + 3;
@@ -430,6 +529,7 @@ class App {
           if (val === ans) {
             AudioManager.instance.playSFX('sfx_bumper');
             StorageManager.instance.unlockByParent(this.pendingUnlockMins);
+            this.hasWarned30s = false;
             this.updateTimeButtons();
             this.updateTimerBadgeUI();
             document.getElementById('time-lock-modal')?.classList.remove('show');
@@ -546,15 +646,7 @@ class App {
         StorageManager.instance.data.currentLevel = i;
         StorageManager.instance.save();
         this.updateLevelList(grade);
-
-        // 点击可挑战关卡直接开启本关
-        const mins = StorageManager.instance.data.sessionMinutes || 5;
-        StorageManager.instance.setSessionMinutes(mins, true);
-        if (startScreen && hud) {
-          startScreen.classList.add('hidden');
-          hud.style.display = 'flex';
-          this.startGame();
-        }
+        this.openContractModal();
       };
 
       scrollRow.appendChild(item);
